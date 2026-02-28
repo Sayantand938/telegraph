@@ -60,6 +60,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty) return;
 
     final timestamp = DateTime.now();
+    final dayOfWeek = _getDayOfWeek(timestamp);
 
     setState(() {
       _messages.add(Message(text: text, isUser: true, timestamp: timestamp));
@@ -70,7 +71,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _focusNode.requestFocus();
 
     try {
-      final response = await _parserManager.processMessage(text, timestamp);
+      // ✅ Send message, timestamp, and day of week
+      final response = await _parserManager.processMessage(
+        text,
+        timestamp,
+        dayOfWeek,
+      );
 
       if (!mounted) return;
 
@@ -87,6 +93,21 @@ class _ChatScreenState extends State<ChatScreen> {
       });
       _scrollToBottom();
     }
+  }
+
+  /// ✅ Get day of week (e.g., "Monday", "Tuesday")
+  String _getDayOfWeek(DateTime dateTime) {
+    const days = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    // DateTime.weekday: 1 = Monday, 7 = Sunday
+    return days[dateTime.weekday - 1];
   }
 
   void _scrollToBottom() {

@@ -1,4 +1,4 @@
-import 'dart:convert'; // ← ADD THIS LINE
+import 'dart:convert';
 import 'parsers/ai_parser.dart';
 import 'parsers/manual_parser.dart';
 import 'module_manager.dart';
@@ -32,7 +32,11 @@ class ParserManager {
   }
 
   /// Route message to appropriate parser, then to module manager
-  Future<String> processMessage(String message, DateTime timestamp) async {
+  Future<String> processMessage(
+    String message,
+    DateTime timestamp,
+    String dayOfWeek,
+  ) async {
     if (!_initialized) init();
 
     _totalProcessed++;
@@ -42,10 +46,10 @@ class ParserManager {
     // Step 1: Parse message (AI or Manual)
     if (_isManualRoute(message)) {
       _manualRouteCount++;
-      parsedData = await _manualParser.parse(message, timestamp);
+      parsedData = await _manualParser.parse(message, timestamp, dayOfWeek);
     } else {
       _aiRouteCount++;
-      parsedData = await _aiParser.parse(message, timestamp);
+      parsedData = await _aiParser.parse(message, timestamp, dayOfWeek);
     }
 
     // Step 2: Route to ModuleManager based on target_module
