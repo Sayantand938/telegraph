@@ -9,42 +9,32 @@ class ManualParser extends BaseParser {
 
   @override
   Future<String> parse(String message, DateTime timestamp) async {
-    // Initialize module manager (idempotent)
     _moduleManager.init();
-
-    // Strip @ prefix and trim whitespace
     final cleaned = stripManualTrigger(message);
+    final parsedData = _extractKeyValuePairs(cleaned);
 
-    // Parse into structured Map
-    final parsedData = _parseCommandMessage(cleaned);
-
-    // Handle parse failure
     if (parsedData.isEmpty) {
-      return '❌ Failed to parse command. Use format: `module --key value`';
+      return '❌ Failed to parse. Use: `@module --key value`';
     }
 
-    // Add routing metadata
-    parsedData['_route'] = 'manual';
-    parsedData['_timestamp'] = timestamp.toIso8601String();
+    final moduleResponse = _moduleManager.route(parsedData, timestamp);
+    final jsonOutput = const JsonEncoder.withIndent('  ').convert(parsedData);
 
-    // Route to ModuleManager for business logic (silent)
-    _moduleManager.route(parsedData, timestamp);
+    final buffer = StringBuffer();
+    buffer.write('✅ **$message**\n\n📦 Parsed:\n```json\n$jsonOutput\n```');
 
-    // Format clean JSON output for UI (exclude internal metadata)
-    final jsonOutput = _formatJsonOutput(parsedData);
-    
-    return '✅ **$message**\n\n📦 Parsed Output:\n```json\n$jsonOutput\n```';
+    if (moduleResponse != null && moduleResponse.isNotEmpty) {
+      buffer.write('\n🔧 $moduleResponse');
+    }
+
+    return buffer.toString();
   }
 
-  Map<String, dynamic> _parseCommandMessage(String message) {
+  Map<String, dynamic> _extractKeyValuePairs(String message) {
     final result = <String, dynamic>{};
-    final trimmed = message.trim();
+    final tokens = _tokenize(message);
 
-    if (trimmed.isEmpty) return result;
-
-    final tokens = _tokenize(trimmed);
     if (tokens.isEmpty) return result;
-
     result['target_module'] = tokens[0];
 
     int i = 1;
@@ -64,38 +54,27 @@ class ManualParser extends BaseParser {
         if (valueParts.isEmpty) {
           result[key] = true;
         } else {
-          final rawValue = valueParts.join(' ');
-
-          if (key == 'tags') {
-            if (rawValue.contains(',')) {
-              result[key] = rawValue
-                  .split(',')
-                  .map((v) => v.trim())
-                  .where((v) => v.isNotEmpty)
-                  .toList();
-            } else {
-              result[key] = [rawValue.trim()];
-            }
-          } else if (rawValue.contains(',')) {
-            result[key] = rawValue
-                .split(',')
-                .map((v) => v.trim())
-                .where((v) => v.isNotEmpty)
-                .toList();
-          } else {
-            result[key] = _parseValue(rawValue);
-          }
+          result[key] = _parseValue(valueParts.join(' '));
         }
       } else {
         i++;
       }
     }
-
     return result;
   }
 
   List<String> _tokenize(String message) {
-    return message.split(RegExp(r'\s+')).where((t) => t.isNotEmpty).toList();
+    final tokens = <String>[];
+    final regex = RegExp(r'"[^"]*"|\S+');
+
+    for (final match in regex.allMatches(message)) {
+      var token = match.group(0)!;
+      if (token.startsWith('"') && token.endsWith('"') && token.length >= 2) {
+        token = token.substring(1, token.length - 1);
+      }
+      if (token.isNotEmpty) tokens.add(token);
+    }
+    return tokens;
   }
 
   dynamic _parseValue(String value) {
@@ -105,25 +84,18 @@ class ManualParser extends BaseParser {
     if (lower == 'true') return true;
     if (lower == 'false') return false;
 
+    // ✅ Fixed variable name
     final numVal = num.tryParse(trimmed);
     if (numVal != null) return numVal;
 
+    if (trimmed.contains(',')) {
+      return trimmed
+          .split(',')
+          .map((v) => v.trim())
+          .where((v) => v.isNotEmpty)
+          .toList();
+    }
+
     return trimmed;
-  }
-
-  /// Format JSON with indentation for UI display
-  String _formatJsonOutput(Map<String, dynamic> data) {
-    final exportData = Map<String, dynamic>.from(data);
-    exportData.remove('_route');
-    exportData.remove('_timestamp');
-    return JsonEncoder.withIndent('  ').convert(exportData);
-  }
-
-  /// Export parsed data as clean JSON string (without internal metadata)
-  String toJsonString(Map<String, dynamic> data) {
-    final exportData = Map<String, dynamic>.from(data);
-    exportData.remove('_route');
-    exportData.remove('_timestamp');
-    return jsonEncode(exportData);
   }
 }

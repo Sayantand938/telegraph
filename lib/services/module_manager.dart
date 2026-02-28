@@ -31,18 +31,18 @@ class ModuleManager {
     module.init();
   }
 
-  /// Route parsed data to appropriate module (silent execution)
-  void route(Map<String, dynamic> parsedData, DateTime timestamp) {
+  /// ✅ Route parsed data to module and return optional user-facing response
+  String? route(Map<String, dynamic> parsedData, DateTime timestamp) {
     if (!_initialized) init();
 
     final targetModule = parsedData['target_module'] as String?;
-
-    if (targetModule == null) return;
+    if (targetModule == null) return null;
 
     final module = _modules[targetModule];
-    if (module == null) return;
+    if (module == null) return null;
 
-    module.handle(parsedData, timestamp);
+    // ✅ Now returns String? from module.handle()
+    return module.handle(parsedData, timestamp);
   }
 
   /// Get list of available modules

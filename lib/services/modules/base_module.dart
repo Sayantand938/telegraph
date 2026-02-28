@@ -9,8 +9,8 @@ abstract class BaseModule {
   /// Initialize module (called once by ModuleManager)
   void init() {}
 
-  /// Handle parsed command - to be implemented by subclasses
-  void handle(Map<String, dynamic> data, DateTime timestamp);
+  /// ✅ Handle parsed command - returns optional user-facing response
+  String? handle(Map<String, dynamic> data, DateTime timestamp);
 
   /// Get module statistics
   Map<String, dynamic> getStats() {
