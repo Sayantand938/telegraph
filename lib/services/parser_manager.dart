@@ -1,6 +1,5 @@
-import 'package:flutter/foundation.dart';
-import 'parsers/ai_parser.dart';
-import 'parsers/manual_parser.dart';
+import 'parsers/ai_parser.dart';      // ✅ Added import
+import 'parsers/manual_parser.dart';  // ✅ Added import
 
 /// Main router that delegates to appropriate parser
 class ParserManager {
@@ -25,28 +24,20 @@ class ParserManager {
     _aiParser = AIParser();
     _manualParser = ManualParser();
     _initialized = true;
-    _logInit();
   }
 
-  void _logInit() {
-    if (!kDebugMode) return;
-    debugPrint('🚀 ParserManager initialized');
-    debugPrint('   ├─ AI Parser:    Active (default route)');
-    debugPrint('   └─ Manual Parser: Active (@ prefix route)');
-  }
-
-  /// Route message to appropriate parser
-  void processMessage(String message, DateTime timestamp) {
+  /// Route message to appropriate parser and return formatted response
+  Future<String> processMessage(String message, DateTime timestamp) async {
     if (!_initialized) init();
 
     _totalProcessed++;
 
     if (_isManualRoute(message)) {
       _manualRouteCount++;
-      _manualParser.parse(message, timestamp);
+      return await _manualParser.parse(message, timestamp);
     } else {
       _aiRouteCount++;
-      _aiParser.parse(message, timestamp);
+      return await _aiParser.parse(message, timestamp);
     }
   }
 

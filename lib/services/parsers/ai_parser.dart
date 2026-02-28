@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'base_parser.dart';
 
 /// Parser for AI-processed messages (default route)
@@ -6,33 +5,21 @@ class AIParser extends BaseParser {
   AIParser() : super('AI Parser');
 
   @override
-  void parse(String message, DateTime timestamp) {
-    // Route indicator
-    final routeInfo = 'Route: AI → Auto-processing enabled';
-
-    // Log the message
-    log(message, timestamp, metadata: routeInfo);
-
+  Future<String> parse(String message, DateTime timestamp) async {
     // TODO: Add actual AI parsing logic here
-    // Examples:
-    // - Intent detection
-    // - NLP processing
-    // - API calls to LLM services
-
-    _processAI(message, timestamp);
-  }
-
-  void _processAI(String message, DateTime timestamp) {
-    // Placeholder for AI logic
-    // This is where you'd integrate with OpenAI, Gemini, etc.
+    // For now, return a clean confirmation
+    
     if (message.toLowerCase().contains('help')) {
-      _logAIResponse('I can help with: commands, info, status');
+      return '🤖 **AI Mode Help**\n\n'
+          'I can assist with:\n'
+          '• 🕐 Time tracking: `@time start --note "Work"`\n'
+          '• ✅ Task management: `@task add --title "Fix bug"`\n'
+          '• 📝 Notes: `@note --title Ideas --content "New feature"`\n\n'
+          'Start with `@` for manual parsing, or type naturally for AI mode.';
     }
-  }
 
-  void _logAIResponse(String response) {
-    if (kDebugMode) {
-      debugPrint('🤖 AI Response Prepared: "$response"');
-    }
+    return '🤖 **AI Mode Received**\n\n'
+        'Message: "$message"\n\n'
+        '✨ *LLM integration pending - try `@` commands for instant parsed output*';
   }
 }

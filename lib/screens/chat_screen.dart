@@ -55,12 +55,12 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
     final timestamp = DateTime.now();
-    final isManual = text.startsWith('@');
+    text.startsWith('@');
 
     setState(() {
       _messages.add(Message(text: text, isUser: true, timestamp: timestamp));
@@ -70,26 +70,25 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
     _focusNode.requestFocus();
 
-    _parserManager.processMessage(text, timestamp);
-
-    Future.delayed(const Duration(milliseconds: 300), () {
+    try {
+      // Await parsed response from parser manager
+      final response = await _parserManager.processMessage(text, timestamp);
+      
       if (!mounted) return;
-      final String response;
-      if (isManual) {
-        final cleaned = text.substring(1).trim();
-        final tokens = cleaned.split(RegExp(r'\s+'));
-        final module = tokens.isNotEmpty ? tokens[0] : 'unknown';
-        // ✅ Simple confirmation - no service calls
-        response = '✅ [$module] Command processed locally';
-      } else {
-        response = '🤖 [AI Mode] Received: "$text"\n(LLM integration pending)';
-      }
+      
       setState(() {
         _messages.add(Message(text: response, isUser: false));
         _isBotTyping = false;
       });
       _scrollToBottom();
-    });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(Message(text: '❌ Error: $e', isUser: false));
+        _isBotTyping = false;
+      });
+      _scrollToBottom();
+    }
   }
 
   void _scrollToBottom() {
@@ -137,7 +136,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 _showParserStats();
               },
             ),
-            // ✅ "View Mock Data" removed - no data service exists
             if (kDebugMode) ...[
               Divider(color: Colors.grey[700]),
               ListTile(
@@ -192,8 +190,6 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
   }
-
-  // ✅ _showMockData() completely removed - no data service
 
   Widget _buildStatRow(String label, String value) {
     return Padding(

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'modules/base_module.dart';
 import 'modules/time_module.dart';
 import 'modules/task_module.dart';
@@ -19,51 +18,30 @@ class ModuleManager {
   void init() {
     if (_initialized) return;
 
-    // Register modules
     registerModule(TimeModule());
     registerModule(TaskModule());
     registerModule(NoteModule());
 
     _initialized = true;
-    _logInit();
-  }
-
-  void _logInit() {
-    if (!kDebugMode) return;
-    debugPrint('📦 ModuleManager initialized');
-    debugPrint('   └─ Registered modules: ${_modules.keys.join(', ')}');
   }
 
   /// Register a module
   void registerModule(BaseModule module) {
     _modules[module.moduleName] = module;
     module.init();
-    if (kDebugMode) {
-      debugPrint('   ├─ Module registered: ${module.moduleName}');
-    }
   }
 
-  /// Route parsed data to appropriate module
+  /// Route parsed data to appropriate module (silent execution)
   void route(Map<String, dynamic> parsedData, DateTime timestamp) {
     if (!_initialized) init();
 
     final targetModule = parsedData['target_module'] as String?;
 
-    if (targetModule == null) {
-      _logError('❌ No target_module specified');
-      return;
-    }
+    if (targetModule == null) return;
 
     final module = _modules[targetModule];
+    if (module == null) return;
 
-    if (module == null) {
-      _logError('❌ Unknown module: $targetModule');
-      _logError('   💡 Available: ${_modules.keys.join(', ')}');
-      return;
-    }
-
-    // ✅ Route to module (changed "Routing" → "Routed")
-    _logDebug('🎯 Routed to module: $targetModule');
     module.handle(parsedData, timestamp);
   }
 
@@ -85,18 +63,6 @@ class ModuleManager {
   void resetStats() {
     for (final module in _modules.values) {
       module.resetStats();
-    }
-  }
-
-  void _logDebug(String message) {
-    if (kDebugMode) {
-      debugPrint('📦 ModuleManager: $message');
-    }
-  }
-
-  void _logError(String message) {
-    if (kDebugMode) {
-      debugPrint('📦 ModuleManager ERROR: $message');
     }
   }
 }
