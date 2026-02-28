@@ -8,22 +8,23 @@ class TaskModule extends BaseModule {
     incrementCommand();
 
     final action = data['action'] as String?;
+    final source = data['source'] ?? 'unknown';
 
     if (action == 'add') {
       final title = data['title'] ?? 'Untitled Task';
       final priority = data['priority'] ?? 'medium';
       final tags = _formatTags(data['tags']);
-      return '📋 **Task Created**\n• Title: $title\n• Priority: $priority\n• Tags: $tags';
+      return '📋 **Task Created**\n• Title: $title\n• Priority: $priority\n• Tags: $tags\n• Source: $source';
     }
     if (action == 'list') {
-      return '📋 **Task List**\n• (No tasks yet - implement storage)';
+      return '📋 **Task List**\n• (No tasks yet - implement storage)\n• Source: $source';
     }
     if (action == 'complete') {
       final id = data['id'] ?? 'unknown';
-      return '✅ **Task Completed**: #$id';
+      return '✅ **Task Completed**: #$id\n• Source: $source';
     }
 
-    return '❌ Unknown action: "$action". Try: add, list, complete';
+    return '❌ Unknown action: "$action". Try: add, list, complete\n• Source: $source';
   }
 
   String _formatTags(dynamic tags) {

@@ -7,14 +7,14 @@ class NoteModule extends BaseModule {
   String? handle(Map<String, dynamic> data, DateTime timestamp) {
     incrementCommand();
 
-    // Notes don't require --action, but support it for future extensibility
     final action = data['action'] as String?;
+    final source = data['source'] ?? 'unknown';
     final title = data['title'] ?? 'Untitled Note';
     final content = data['content'] ?? '';
     final tags = _formatTags(data['tags']);
 
     if (action == 'list') {
-      return '📝 **Notes List**\n• (No notes yet - implement storage)';
+      return '📝 **Notes List**\n• (No notes yet - implement storage)\n• Source: $source';
     }
 
     // Default: create/save note
@@ -22,7 +22,7 @@ class NoteModule extends BaseModule {
         ? (content.length > 60 ? content.substring(0, 60) + '...' : content)
         : '(empty)';
 
-    return '📝 **Note Saved**\n• Title: $title\n• Tags: $tags\n• Preview: $preview';
+    return '📝 **Note Saved**\n• Title: $title\n• Tags: $tags\n• Preview: $preview\n• Source: $source';
   }
 
   String _formatTags(dynamic tags) {

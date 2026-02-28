@@ -1,40 +1,40 @@
-import 'dart:convert';
 import 'base_parser.dart';
-import '../module_manager.dart';
 
+/// Parser for manually triggered commands (@ prefix)
+/// Extracts target_module and key-value pairs from command syntax
 class ManualParser extends BaseParser {
-  final ModuleManager _moduleManager = ModuleManager();
-
   ManualParser() : super('Manual Parser');
 
   @override
-  Future<String> parse(String message, DateTime timestamp) async {
-    _moduleManager.init();
+  Future<Map<String, dynamic>> parse(String message, DateTime timestamp) async {
     final cleaned = stripManualTrigger(message);
     final parsedData = _extractKeyValuePairs(cleaned);
 
-    if (parsedData.isEmpty) {
-      return '❌ Failed to parse. Use: `@module --key value`';
+    // Ensure standard fields exist
+    if (!parsedData.containsKey('source')) {
+      parsedData['source'] = 'manual';
+    }
+    if (!parsedData.containsKey('original_message')) {
+      parsedData['original_message'] = message;
+    }
+    if (!parsedData.containsKey('timestamp')) {
+      parsedData['timestamp'] = timestamp.toIso8601String();
     }
 
-    final moduleResponse = _moduleManager.route(parsedData, timestamp);
-    final jsonOutput = const JsonEncoder.withIndent('  ').convert(parsedData);
-
-    final buffer = StringBuffer();
-    buffer.write('✅ **$message**\n\n📦 Parsed:\n```json\n$jsonOutput\n```');
-
-    if (moduleResponse != null && moduleResponse.isNotEmpty) {
-      buffer.write('\n🔧 $moduleResponse');
-    }
-
-    return buffer.toString();
+    return parsedData;
   }
 
   Map<String, dynamic> _extractKeyValuePairs(String message) {
     final result = <String, dynamic>{};
     final tokens = _tokenize(message);
 
-    if (tokens.isEmpty) return result;
+    if (tokens.isEmpty) {
+      result['target_module'] = 'chat';
+      result['action'] = 'unknown';
+      return result;
+    }
+
+    // First token is target module
     result['target_module'] = tokens[0];
 
     int i = 1;
@@ -57,9 +57,19 @@ class ManualParser extends BaseParser {
           result[key] = _parseValue(valueParts.join(' '));
         }
       } else {
+        // First non-flag token after module is action
+        if (!result.containsKey('action')) {
+          result['action'] = token;
+        }
         i++;
       }
     }
+
+    // Default action if not specified
+    if (!result.containsKey('action')) {
+      result['action'] = 'default';
+    }
+
     return result;
   }
 
@@ -84,7 +94,6 @@ class ManualParser extends BaseParser {
     if (lower == 'true') return true;
     if (lower == 'false') return false;
 
-    // ✅ Fixed variable name
     final numVal = num.tryParse(trimmed);
     if (numVal != null) return numVal;
 

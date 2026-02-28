@@ -19,7 +19,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   final ParserManager _parserManager = ParserManager();
-  
+
   final List<Message> _messages = [];
   bool _isBotTyping = false;
 
@@ -60,7 +60,6 @@ class _ChatScreenState extends State<ChatScreen> {
     if (text.isEmpty) return;
 
     final timestamp = DateTime.now();
-    text.startsWith('@');
 
     setState(() {
       _messages.add(Message(text: text, isUser: true, timestamp: timestamp));
@@ -71,11 +70,10 @@ class _ChatScreenState extends State<ChatScreen> {
     _focusNode.requestFocus();
 
     try {
-      // Await parsed response from parser manager
       final response = await _parserManager.processMessage(text, timestamp);
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         _messages.add(Message(text: response, isUser: false));
         _isBotTyping = false;
@@ -114,23 +112,35 @@ class _ChatScreenState extends State<ChatScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.person, color: Colors.white),
-              title: const Text('Profile', style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Profile',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
               leading: const Icon(Icons.notifications, color: Colors.white),
-              title: const Text('Notifications', style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Notifications',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
               leading: const Icon(Icons.settings, color: Colors.white),
-              title: const Text('Settings', style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Settings',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () => Navigator.pop(context),
             ),
             Divider(color: Colors.grey[700]),
             ListTile(
               leading: const Icon(Icons.info_outline, color: Colors.white),
-              title: const Text('Parser Stats', style: TextStyle(color: Colors.white)),
+              title: const Text(
+                'Parser Stats',
+                style: TextStyle(color: Colors.white),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 _showParserStats();
@@ -140,7 +150,10 @@ class _ChatScreenState extends State<ChatScreen> {
               Divider(color: Colors.grey[700]),
               ListTile(
                 leading: const Icon(Icons.info, color: Colors.grey),
-                title: const Text('Local Mode Active', style: TextStyle(color: Colors.grey)),
+                title: const Text(
+                  'Local Mode Active',
+                  style: TextStyle(color: Colors.grey),
+                ),
                 enabled: false,
               ),
             ],
@@ -166,17 +179,40 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildStatRow('AI Parser', stats['aiParser'] ?? 'Unknown'),
-              _buildStatRow('Manual Parser', stats['manualParser'] ?? 'Unknown'),
+              _buildStatRow(
+                'Manual Parser',
+                stats['manualParser'] ?? 'Unknown',
+              ),
+              _buildStatRow(
+                'Module Manager',
+                stats['moduleManager'] ?? 'Unknown',
+              ),
               _buildStatRow('Manual Trigger', stats['manualTrigger'] ?? '@'),
               const SizedBox(height: 12),
-              const Text('Processed:', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              _buildStatRow('Total', '${stats['stats']?['totalProcessed'] ?? 0}'),
-              _buildStatRow('AI Route', '${stats['stats']?['aiRouteCount'] ?? 0}'),
-              _buildStatRow('Manual Route', '${stats['stats']?['manualRouteCount'] ?? 0}'),
+              const Text(
+                'Processed:',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              _buildStatRow(
+                'Total',
+                '${stats['stats']?['totalProcessed'] ?? 0}',
+              ),
+              _buildStatRow(
+                'AI Route',
+                '${stats['stats']?['aiRouteCount'] ?? 0}',
+              ),
+              _buildStatRow(
+                'Manual Route',
+                '${stats['stats']?['manualRouteCount'] ?? 0}',
+              ),
               const SizedBox(height: 16),
               Text(
                 '💡 Tip: Start with @ for Manual Parser',
-                style: TextStyle(color: Colors.grey[400], fontSize: 12, fontFamily: 'JetBrains Mono'),
+                style: TextStyle(
+                  color: Colors.grey[400],
+                  fontSize: 12,
+                  fontFamily: 'JetBrains Mono',
+                ),
               ),
             ],
           ),
@@ -235,7 +271,8 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.all(8.0),
               itemCount: _messages.length,
-              itemBuilder: (context, index) => ChatBubble(message: _messages[index]),
+              itemBuilder: (context, index) =>
+                  ChatBubble(message: _messages[index]),
             ),
           ),
           if (_isBotTyping) const TypingIndicator(),

@@ -2,6 +2,7 @@ import 'modules/base_module.dart';
 import 'modules/time_module.dart';
 import 'modules/task_module.dart';
 import 'modules/note_module.dart';
+import 'modules/chat_module.dart';
 
 /// Routes parsed commands to appropriate module managers
 class ModuleManager {
@@ -21,6 +22,7 @@ class ModuleManager {
     registerModule(TimeModule());
     registerModule(TaskModule());
     registerModule(NoteModule());
+    registerModule(ChatModule()); // For general AI conversations
 
     _initialized = true;
   }
@@ -31,17 +33,19 @@ class ModuleManager {
     module.init();
   }
 
-  /// ✅ Route parsed data to module and return optional user-facing response
+  /// Route parsed data to module and return user-facing response
   String? route(Map<String, dynamic> parsedData, DateTime timestamp) {
     if (!_initialized) init();
 
     final targetModule = parsedData['target_module'] as String?;
-    if (targetModule == null) return null;
+    if (targetModule == null) return '❌ No target_module specified';
 
     final module = _modules[targetModule];
-    if (module == null) return null;
+    if (module == null) {
+      return '❌ Module "$targetModule" not found. Available: ${_modules.keys.join(", ")}';
+    }
 
-    // ✅ Now returns String? from module.handle()
+    // Route to module handler
     return module.handle(parsedData, timestamp);
   }
 

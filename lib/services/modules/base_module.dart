@@ -9,7 +9,7 @@ abstract class BaseModule {
   /// Initialize module (called once by ModuleManager)
   void init() {}
 
-  /// ✅ Handle parsed command - returns optional user-facing response
+  /// Handle parsed command - returns user-facing response
   String? handle(Map<String, dynamic> data, DateTime timestamp);
 
   /// Get module statistics

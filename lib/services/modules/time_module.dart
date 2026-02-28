@@ -7,22 +7,22 @@ class TimeModule extends BaseModule {
   String? handle(Map<String, dynamic> data, DateTime timestamp) {
     incrementCommand();
 
-    // ✅ Explicit --action flag required
     final action = data['action'] as String?;
+    final source = data['source'] ?? 'unknown';
 
     if (action == 'start') {
       final note = data['note'] ?? 'Untitled';
       final tags = _formatTags(data['tags']);
-      return '⏱️ **Timer Started**\n• Note: $note\n• Tags: $tags\n• Time: ${_formatTime(timestamp)}';
+      return '⏱️ **Timer Started**\n• Note: $note\n• Tags: $tags\n• Time: ${_formatTime(timestamp)}\n• Source: $source';
     }
     if (action == 'stop') {
-      return '⏹️ **Timer Stopped**\n• Duration: 00:00 (stub)';
+      return '⏹️ **Timer Stopped**\n• Duration: 00:00 (stub)\n• Source: $source';
     }
     if (action == 'status') {
-      return '⏱️ **Timer Status**: ${data['running'] == true ? 'Running' : 'Idle'}';
+      return '⏱️ **Timer Status**: ${data['running'] == true ? 'Running' : 'Idle'}\n• Source: $source';
     }
 
-    return '❌ Unknown action: "$action". Try: start, stop, status';
+    return '❌ Unknown action: "$action". Try: start, stop, status\n• Source: $source';
   }
 
   String _formatTags(dynamic tags) {

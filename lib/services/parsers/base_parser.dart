@@ -4,8 +4,8 @@ abstract class BaseParser {
 
   BaseParser(this.name);
 
-  /// Process a message and return formatted response for UI
-  Future<String> parse(String message, DateTime timestamp);
+  /// Process a message and return structured data for ModuleManager
+  Future<Map<String, dynamic>> parse(String message, DateTime timestamp);
 
   /// Utility: Check if message starts with @
   bool isManualTrigger(String message) => message.trim().startsWith('@');
