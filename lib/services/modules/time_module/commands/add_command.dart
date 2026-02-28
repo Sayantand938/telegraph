@@ -7,36 +7,30 @@ class AddCommand {
 
   AddCommand(this._db);
 
-  Future<String> execute(
-    Map<String, dynamic> data,
-    DateTime timestamp,
-    String source,
-  ) async {
+  Future<String> execute(Map<String, dynamic> data, DateTime timestamp) async {
     final startTimeStr = data['start_time'] as String?;
     final endTimeStr = data['end_time'] as String?;
 
     if (startTimeStr == null || endTimeStr == null) {
-      return '❌ **Missing Time Data**\n\n'
+      return '❌ **Missing Time Data**\n'
           '* **Required:** `--start_time "YYYY-MM-DD HH:MM"`\n'
-          '* **Required:** `--end_time "YYYY-MM-DD HH:MM"`\n'
-          '* **Source:** $source';
+          '* **Required:** `--end_time "YYYY-MM-DD HH:MM"`';
     }
 
     DateTime startTime;
     DateTime endTime;
+
     try {
       startTime = DateTime.parse(startTimeStr);
       endTime = DateTime.parse(endTimeStr);
     } catch (e) {
-      return '❌ **Invalid Time Format**\n\n'
-          '* **Format:** Use `"YYYY-MM-DD HH:MM"`\n'
-          '* **Source:** $source';
+      return '❌ **Invalid Time Format**\n'
+          '* **Format:** Use `"YYYY-MM-DD HH:MM"`';
     }
 
     if (endTime.isBefore(startTime) || endTime.isAtSameMomentAs(startTime)) {
-      return '❌ **Invalid Time Range**\n\n'
-          '* **Error:** End time must be after start time.\n'
-          '* **Source:** $source';
+      return '❌ **Invalid Time Range**\n'
+          '* **Error:** End time must be after start time.';
     }
 
     final note = data['note'] as String? ?? 'Manual Entry';
@@ -46,17 +40,16 @@ class AddCommand {
     // Check overlap
     final overlap = await checkOverlap(_db, startTime, endTime, note);
     if (overlap != null) {
-      return '⚠️ **Overlap Detected**\n\n'
-          '* **Conflict:** "${overlap['note']}"\n'
-          '* **Source:** $source';
+      return '⚠️ **Overlap Detected**\n'
+          '* **Conflict:** "${overlap['note']}"';
     }
 
     // Check overnight
     if (spansOvernight(startTime, endTime)) {
-      return await _handleOvernightAdd(startTime, endTime, note, tags, source);
+      return await _handleOvernightAdd(startTime, endTime, note, tags);
     }
 
-    // Insert
+    // Insert single session
     await _db.insertSession({
       'id': id,
       'start_time': startTime.toIso8601String(),
@@ -68,13 +61,12 @@ class AddCommand {
     });
 
     final duration = endTime.difference(startTime);
-    return '➕ **Session Added**\n\n'
+    return '➕ **Session Added**\n'
         '* **ID:** `$id`\n'
         '* **Note:** $note\n'
         '* **Duration:** ${formatDuration(duration)}\n'
         '* **Start:** ${formatDateTime(startTime)}\n'
-        '* **End:** ${formatDateTime(endTime)}\n'
-        '* **Source:** $source';
+        '* **End:** ${formatDateTime(endTime)}';
   }
 
   Future<String> _handleOvernightAdd(
@@ -82,33 +74,33 @@ class AddCommand {
     DateTime endTime,
     String note,
     List<String> tags,
-    String source,
   ) async {
     final sessionsCreated = <Map<String, dynamic>>[];
-    var currentDate = DateTime(startTime.year, startTime.month, startTime.day);
     var currentTime = startTime;
 
-    while (currentDate.isBefore(endTime)) {
+    while (currentTime.isBefore(endTime)) {
+      // Calculate the start of the next day (midnight)
       final nextDay = DateTime(
-        currentDate.year,
-        currentDate.month,
-        currentDate.day + 1,
+        currentTime.year,
+        currentTime.month,
+        currentTime.day + 1,
       );
+
+      // The session ends at either the next midnight or the final end time
       final sessionEnd = nextDay.isBefore(endTime) ? nextDay : endTime;
 
-      if (sessionEnd.isAfter(currentTime)) {
-        final id = generateId();
-        sessionsCreated.add({
-          'id': id,
-          'start_time': currentTime.toIso8601String(),
-          'end_time': sessionEnd.toIso8601String(),
-          'note': '$note (Part ${sessionsCreated.length + 1})',
-          'tags': tags.join(','),
-          'is_active': 0,
-          'created_at': DateTime.now().toIso8601String(),
-        });
-      }
-      currentDate = nextDay;
+      final id = generateId();
+      sessionsCreated.add({
+        'id': id,
+        'start_time': currentTime.toIso8601String(),
+        'end_time': sessionEnd.toIso8601String(),
+        'note': '$note (Part ${sessionsCreated.length + 1})',
+        'tags': tags.join(','),
+        'is_active': 0,
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
+      // Advance currentTime to the start of the next segment
       currentTime = nextDay;
     }
 
@@ -117,11 +109,9 @@ class AddCommand {
     }
 
     final totalDuration = endTime.difference(startTime);
-
-    return '🌙 **Overnight Session Split**\n\n'
+    return '🌙 **Overnight Session Split**\n'
         '* **Original Note:** $note\n'
         '* **Splits:** Created ${sessionsCreated.length} daily entries\n'
-        '* **Total Duration:** ${formatDuration(totalDuration)}\n'
-        '* **Source:** $source';
+        '* **Total Duration:** ${formatDuration(totalDuration)}';
   }
 }

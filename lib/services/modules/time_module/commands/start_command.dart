@@ -7,11 +7,7 @@ class StartCommand {
 
   StartCommand(this._db);
 
-  Future<String> execute(
-    Map<String, dynamic> data,
-    DateTime timestamp,
-    String source,
-  ) async {
+  Future<String> execute(Map<String, dynamic> data, DateTime timestamp) async {
     // 1. Check for active session
     final activeSessions = await _db.querySessions(
       where: 'is_active = ?',
@@ -20,11 +16,10 @@ class StartCommand {
 
     if (activeSessions.isNotEmpty) {
       final s = activeSessions.first;
-      return '⚠️ **Cannot Start Session**\n\n'
+      return '⚠️ **Cannot Start Session**\n'
           '* **Conflict:** You already have an active session: "${s['note']}"\n'
           '* **Started:** ${formatDateTime(DateTime.parse(s['start_time']))}\n'
-          '* **Action:** Please stop it first with `@time --action stop`\n'
-          '* **Source:** $source';
+          '* **Action:** Please stop it first with `@time --action stop`';
     }
 
     final note = data['note'] as String? ?? 'Untitled Session';
@@ -39,11 +34,10 @@ class StartCommand {
           ? formatDateTime(DateTime.parse(overlap['end_time']))
           : "Active";
 
-      return '⚠️ **Overlap Detected**\n\n'
+      return '⚠️ **Overlap Detected**\n'
           '* **Error:** Cannot start session: "$note"\n'
           '* **Overlaps With:** "${overlap['note']}"\n'
-          '* **Interval:** ${formatDateTime(overlapStart)} — $overlapEndStr\n'
-          '* **Source:** $source';
+          '* **Interval:** ${formatDateTime(overlapStart)} — $overlapEndStr';
     }
 
     // 3. Insert new session
@@ -57,11 +51,10 @@ class StartCommand {
       'created_at': DateTime.now().toIso8601String(),
     });
 
-    return '⏱️ **Timer Started**\n\n'
+    return '⏱️ **Timer Started**\n'
         '* **ID:** `$id`\n'
         '* **Note:** $note\n'
         '* **Tags:** ${tags.isNotEmpty ? tags.join(", ") : "_none_"}\n'
-        '* **Started:** ${formatDateTime(timestamp)}\n'
-        '* **Source:** $source';
+        '* **Started:** ${formatDateTime(timestamp)}';
   }
 }

@@ -7,11 +7,7 @@ class StopCommand {
 
   StopCommand(this._db);
 
-  Future<String> execute(
-    Map<String, dynamic> data,
-    DateTime timestamp,
-    String source,
-  ) async {
+  Future<String> execute(Map<String, dynamic> data, DateTime timestamp) async {
     // 1. Check for active session
     final activeSessions = await _db.querySessions(
       where: 'is_active = ?',
@@ -19,10 +15,9 @@ class StopCommand {
     );
 
     if (activeSessions.isEmpty) {
-      return '⚠️ **No Active Session**\n\n'
+      return '⚠️ **No Active Session**\n'
           '* **Error:** Cannot stop — no timer is currently running.\n'
-          '* **Action:** Start one with: `@time --action start --note "Work"`\n'
-          '* **Source:** $source';
+          '* **Action:** Start one with: `@time --action start --note "Work"`';
     }
 
     final session = activeSessions.first;
@@ -31,16 +26,15 @@ class StopCommand {
 
     // 2. Validate endtime > starttime
     if (endTime.isBefore(startTime) || endTime.isAtSameMomentAs(startTime)) {
-      return '❌ **Invalid Time**\n\n'
+      return '❌ **Invalid Time**\n'
           '* **Error:** End time must be after start time.\n'
           '* **Start:** ${formatDateTime(startTime)}\n'
-          '* **End:** ${formatDateTime(endTime)}\n'
-          '* **Source:** $source';
+          '* **End:** ${formatDateTime(endTime)}';
     }
 
     // 3. Check overnight split
     if (spansOvernight(startTime, endTime)) {
-      return await _handleOvernightSplit(session, endTime, source);
+      return await _handleOvernightSplit(session, endTime);
     }
 
     // 4. Normal stop
@@ -50,31 +44,29 @@ class StopCommand {
     });
 
     final duration = endTime.difference(startTime);
-    return '⏹️ **Timer Stopped**\n\n'
+    return '⏹️ **Timer Stopped**\n'
         '* **ID:** `${session['id']}`\n'
         '* **Note:** ${session['note']}\n'
         '* **Duration:** ${formatDuration(duration)}\n'
         '* **Start:** ${formatDateTime(startTime)}\n'
-        '* **End:** ${formatDateTime(endTime)}\n'
-        '* **Source:** $source';
+        '* **End:** ${formatDateTime(endTime)}';
   }
 
   Future<String> _handleOvernightSplit(
     Map<String, dynamic> session,
     DateTime endTime,
-    String source,
   ) async {
     final startTime = DateTime.parse(session['start_time']);
     final sessionsCreated = <Map<String, dynamic>>[];
-    var currentDate = DateTime(startTime.year, startTime.month, startTime.day);
     var currentTime = startTime;
 
-    while (currentDate.isBefore(endTime)) {
+    while (currentTime.isBefore(endTime)) {
       final nextDay = DateTime(
-        currentDate.year,
-        currentDate.month,
-        currentDate.day + 1,
+        currentTime.year,
+        currentTime.month,
+        currentTime.day + 1,
       );
+
       final sessionEnd = nextDay.isBefore(endTime) ? nextDay : endTime;
 
       if (sessionEnd.isAfter(currentTime)) {
@@ -89,22 +81,21 @@ class StopCommand {
           'created_at': DateTime.now().toIso8601String(),
         });
       }
-      currentDate = nextDay;
+
       currentTime = nextDay;
     }
 
     // Delete original active session and insert splits
     await _db.deleteSession(session['id']);
+
     for (final s in sessionsCreated) {
       await _db.insertSession(s);
     }
 
     final totalDuration = endTime.difference(startTime);
-
-    return '🌙 **Overnight Session Split**\n\n'
+    return '🌙 **Overnight Session Split**\n'
         '* **Original:** ${session['note']}\n'
         '* **Splits:** Created ${sessionsCreated.length} daily entries\n'
-        '* **Total Duration:** ${formatDuration(totalDuration)}\n'
-        '* **Source:** $source';
+        '* **Total Duration:** ${formatDuration(totalDuration)}';
   }
 }

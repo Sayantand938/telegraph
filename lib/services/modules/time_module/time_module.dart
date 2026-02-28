@@ -12,6 +12,7 @@ class TimeModule extends BaseModule {
   TimeModule() : super('time');
 
   final DatabaseHelper _db = DatabaseHelper();
+
   late final StartCommand _startCommand;
   late final StopCommand _stopCommand;
   late final AddCommand _addCommand;
@@ -32,21 +33,20 @@ class TimeModule extends BaseModule {
   Future<String?> handle(Map<String, dynamic> data, DateTime timestamp) async {
     incrementCommand();
     final action = data['action'] as String?;
-    final source = data['source'] ?? 'manual';
 
     switch (action) {
       case 'start':
-        return await _startCommand.execute(data, timestamp, source);
+        return await _startCommand.execute(data, timestamp);
       case 'stop':
-        return await _stopCommand.execute(data, timestamp, source);
+        return await _stopCommand.execute(data, timestamp);
       case 'add':
-        return await _addCommand.execute(data, timestamp, source);
+        return await _addCommand.execute(data, timestamp);
       case 'status':
-        return await _statusCommand.execute(source);
+        return await _statusCommand.execute();
       case 'list':
-        return await _listCommand.execute(source);
+        return await _listCommand.execute();
       default:
-        return '❌ Unknown action: "$action". Try: start, stop, add, status, list\n• Source: $source';
+        return '❌ Unknown action: "$action". Try: start, stop, add, status, list';
     }
   }
 
