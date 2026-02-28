@@ -4,9 +4,8 @@ class NoteModule extends BaseModule {
   NoteModule() : super('note');
 
   @override
-  String? handle(Map<String, dynamic> data, DateTime timestamp) {
+  Future<String?> handle(Map<String, dynamic> data, DateTime timestamp) async {
     incrementCommand();
-
     final action = data['action'] as String?;
     final source = data['source'] ?? 'unknown';
     final title = data['title'] ?? 'Untitled Note';
@@ -17,7 +16,6 @@ class NoteModule extends BaseModule {
       return '📝 **Notes List**\n• (No notes yet - implement storage)\n• Source: $source';
     }
 
-    // Default: create/save note
     final preview = content.isNotEmpty
         ? (content.length > 60 ? content.substring(0, 60) + '...' : content)
         : '(empty)';

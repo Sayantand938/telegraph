@@ -4,9 +4,8 @@ class TaskModule extends BaseModule {
   TaskModule() : super('task');
 
   @override
-  String? handle(Map<String, dynamic> data, DateTime timestamp) {
+  Future<String?> handle(Map<String, dynamic> data, DateTime timestamp) async {
     incrementCommand();
-
     final action = data['action'] as String?;
     final source = data['source'] ?? 'unknown';
 
@@ -16,9 +15,11 @@ class TaskModule extends BaseModule {
       final tags = _formatTags(data['tags']);
       return '📋 **Task Created**\n• Title: $title\n• Priority: $priority\n• Tags: $tags\n• Source: $source';
     }
+
     if (action == 'list') {
       return '📋 **Task List**\n• (No tasks yet - implement storage)\n• Source: $source';
     }
+
     if (action == 'complete') {
       final id = data['id'] ?? 'unknown';
       return '✅ **Task Completed**: #$id\n• Source: $source';

@@ -1,11 +1,10 @@
+// lib/services/module_manager.dart
 import 'modules/base_module.dart';
 import 'modules/time_module.dart';
 import 'modules/task_module.dart';
 import 'modules/note_module.dart';
 import 'modules/chat_module.dart';
 
-/// Routes parsed commands to appropriate module managers
-/// ✅ Handles missing 'target_module' gracefully
 class ModuleManager {
   static final ModuleManager _instance = ModuleManager._internal();
   factory ModuleManager() => _instance;
@@ -28,18 +27,22 @@ class ModuleManager {
     module.init();
   }
 
-  String? route(Map<String, dynamic> parsedData, DateTime timestamp) {
+  // ✅ CHANGE 1: Make route async
+  Future<String?> route(
+    Map<String, dynamic> parsedData,
+    DateTime timestamp,
+  ) async {
     if (!_initialized) init();
 
-    // ✅ Safe routing: Default to 'chat' if module not specified by parser
     final targetModule = parsedData['target_module'] as String? ?? 'chat';
-
     final module = _modules[targetModule];
+
     if (module == null) {
       return '❌ Module "$targetModule" not found. Available: ${_modules.keys.join(", ")}';
     }
 
-    return module.handle(parsedData, timestamp);
+    // ✅ CHANGE 2: Await the async handle method
+    return await module.handle(parsedData, timestamp);
   }
 
   List<String> getAvailableModules() => _modules.keys.toList();

@@ -1,8 +1,16 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'screens/chat_screen.dart';
+// ✅ Add this import for DatabaseHelper
+import 'services/database/database_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ✅ Initialize SQLite FFI for Windows/desktop support
+  // (Safe to call on all platforms - only does something on desktop)
+  DatabaseHelper.init();
+
   runApp(const ChatApp());
 }
 
