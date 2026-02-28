@@ -35,8 +35,9 @@ class TimeModule extends BaseModule {
   void _handleStart(Map<String, dynamic> data, DateTime timestamp) {
     log('▶️ Starting timer...', level: 'SUCCESS');
     if (data['note'] != null) log('   📝 ${data['note']}');
-    if (data['tags'] is List)
+    if (data['tags'] is List) {
       log('   🏷️ ${(data['tags'] as List).join(', ')}');
+    }
 
     // Save to Firestore
     _firebase.saveTimeEntry({

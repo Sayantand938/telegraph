@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../services/parser_manager.dart';
+import '../services/firebase_service.dart'; // Now points to mock
+import 'package:flutter/foundation.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/chat_bubble.dart';
 import '../widgets/chat_input.dart';
@@ -18,6 +20,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   final ParserManager _parserManager = ParserManager();
+  final FirebaseService _firebase = FirebaseService(); // Mock instance
 
   final List<Message> _messages = [];
   bool _isBotTyping = false;
@@ -25,13 +28,21 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize the parser manager with AI and Manual sub-modules
     _parserManager.init();
 
-    // Request focus when widget loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
+
+    // Welcome message
+    _addBotMessage(
+      '👋 Welcome to Telegraph!\n\n'
+      'Try commands:\n'
+      '• @time start --note "Work" --tags dev,flutter\n'
+      '• @task add --title "Fix bug" --priority high\n'
+      '• @note --title Ideas --content "Add export feature"\n\n'
+      'Start with @ for manual mode, or type normally for AI mode.',
+    );
   }
 
   @override
@@ -42,33 +53,55 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  void _addBotMessage(String text) {
+    setState(() {
+      _messages.add(Message(text: text, isUser: false));
+    });
+    _scrollToBottom();
+  }
+
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
     final timestamp = DateTime.now();
+    final isManual = text.startsWith('@');
 
-    // Send to ParserManager for routing (AI or Manual based on @ prefix)
-    _parserManager.processMessage(text, timestamp);
-
+    // Add user message
     setState(() {
       _messages.add(Message(text: text, isUser: true, timestamp: timestamp));
       _controller.clear();
       _isBotTyping = true;
     });
-
     _scrollToBottom();
     _focusNode.requestFocus();
 
-    // Echo response after delay
-    Future.delayed(const Duration(milliseconds: 600), () {
+    // Process message
+    _parserManager.processMessage(text, timestamp);
+
+    // Show response after short delay (simulates processing)
+    Future.delayed(const Duration(milliseconds: 300), () {
       if (!mounted) return;
+
+      final String response;
+      if (isManual) {
+        // Show mock confirmation based on command
+        final cleaned = text.substring(1).trim();
+        final tokens = cleaned.split(RegExp(r'\s+'));
+        final module = tokens.isNotEmpty ? tokens[0] : 'unknown';
+        
+        response = '✅ [$module] Processed locally\n'
+            '📊 Stats: ${_firebase.getStats()}';
+      } else {
+        response = '🤖 [AI Mode] Received: "$text"\n'
+            '(LLM integration pending)';
+      }
+
       setState(() {
-        _messages.add(Message(text: text, isUser: false));
+        _messages.add(Message(text: response, isUser: false));
         _isBotTyping = false;
       });
       _scrollToBottom();
-      _focusNode.requestFocus();
     });
   }
 
@@ -87,50 +120,56 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showMenu() {
     showModalBottomSheet(
       context: context,
-      backgroundColor:
-          Colors.grey[850], // ← Remove 'const' from Container below
+      backgroundColor: Colors.grey[850],
       builder: (context) => Container(
-        // ← Was: 'const Container' - REMOVE const
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.person, color: Colors.white),
-              title: const Text(
-                'Profile',
-                style: TextStyle(color: Colors.white),
-              ),
+              title: const Text('Profile', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
               leading: const Icon(Icons.notifications, color: Colors.white),
-              title: const Text(
-                'Notifications',
-                style: TextStyle(color: Colors.white),
-              ),
+              title: const Text('Notifications', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
               leading: const Icon(Icons.settings, color: Colors.white),
-              title: const Text(
-                'Settings',
-                style: TextStyle(color: Colors.white),
-              ),
+              title: const Text('Settings', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
             ),
             Divider(color: Colors.grey[700]),
             ListTile(
               leading: const Icon(Icons.info_outline, color: Colors.white),
-              title: const Text(
-                'Parser Stats',
-                style: TextStyle(color: Colors.white),
-              ),
+              title: const Text('Parser Stats', style: TextStyle(color: Colors.white)),
               onTap: () {
                 Navigator.pop(context);
                 _showParserStats();
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.storage, color: Colors.white),
+              title: const Text('View Mock Data', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _showMockData();
+              },
+            ),
+            if (kDebugMode) ...[
+              Divider(color: Colors.grey[700]),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Clear Mock Data', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _firebase.clearAll();
+                  _addBotMessage('🗑️ Mock data cleared');
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -153,20 +192,53 @@ class _ChatScreenState extends State<ChatScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildStatRow('AI Parser', stats['aiParser'] ?? 'Unknown'),
-              _buildStatRow(
-                'Manual Parser',
-                stats['manualParser'] ?? 'Unknown',
-              ),
+              _buildStatRow('Manual Parser', stats['manualParser'] ?? 'Unknown'),
               _buildStatRow('Manual Trigger', stats['manualTrigger'] ?? '@'),
-              _buildStatRow('Last Updated', stats['timestamp'] ?? 'N/A'),
+              const SizedBox(height: 12),
+              const Text('Processed:', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              _buildStatRow('Total', '${stats['stats']?['totalProcessed'] ?? 0}'),
+              _buildStatRow('AI Route', '${stats['stats']?['aiRouteCount'] ?? 0}'),
+              _buildStatRow('Manual Route', '${stats['stats']?['manualRouteCount'] ?? 0}'),
               const SizedBox(height: 16),
               Text(
-                '💡 Tip: Start a message with @ to route to Manual Parser',
-                style: TextStyle(
-                  color: Colors.grey[400],
-                  fontSize: 12,
-                  fontFamily: 'JetBrains Mono',
-                ),
+                '💡 Tip: Start with @ for Manual Parser',
+                style: TextStyle(color: Colors.grey[400], fontSize: 12, fontFamily: 'JetBrains Mono'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close', style: TextStyle(color: Colors.blue)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMockData() {
+    final stats = _firebase.getStats();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.grey[850],
+        title: const Text(
+          'Mock Data Store',
+          style: TextStyle(color: Colors.white, fontFamily: 'JetBrains Mono'),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildStatRow('Time Entries', '${stats['time_entries']}'),
+              _buildStatRow('Tasks', '${stats['tasks']}'),
+              _buildStatRow('Notes', '${stats['notes']}'),
+              const SizedBox(height: 16),
+              const Text(
+                'Data is stored in-memory only.\nResets when app restarts.',
+                style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
             ],
           ),
@@ -187,23 +259,8 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[400],
-              fontFamily: 'JetBrains Mono',
-              fontSize: 13,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontFamily: 'JetBrains Mono',
-              fontWeight: FontWeight.w500,
-              fontSize: 13,
-            ),
-          ),
+          Text(label, style: TextStyle(color: Colors.grey[400], fontFamily: 'JetBrains Mono', fontSize: 13)),
+          Text(value, style: const TextStyle(color: Colors.white, fontFamily: 'JetBrains Mono', fontWeight: FontWeight.w500, fontSize: 13)),
         ],
       ),
     );
@@ -212,11 +269,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(
-        title: 'Echo Bot',
-        isTyping: _isBotTyping,
-        onMenuPressed: _showMenu,
-      ),
+      appBar: CustomAppBar(title: 'Echo Bot', isTyping: _isBotTyping, onMenuPressed: _showMenu),
       backgroundColor: Colors.grey[900],
       body: Column(
         children: [
@@ -225,18 +278,12 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _scrollController,
               padding: const EdgeInsets.all(8.0),
               itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                return ChatBubble(message: _messages[index]);
-              },
+              itemBuilder: (context, index) => ChatBubble(message: _messages[index]),
             ),
           ),
           if (_isBotTyping) const TypingIndicator(),
           Divider(color: Colors.grey[800], height: 1),
-          ChatInput(
-            controller: _controller,
-            focusNode: _focusNode,
-            onSend: _sendMessage,
-          ),
+          ChatInput(controller: _controller, focusNode: _focusNode, onSend: _sendMessage),
         ],
       ),
     );

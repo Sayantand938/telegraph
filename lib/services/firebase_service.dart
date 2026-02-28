@@ -1,65 +1,101 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
-/// Dead-simple Firestore helper for personal use
+/// Mock Firebase service for local testing - NO external dependencies
+/// Same interface as original - easy to swap back later
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
   factory FirebaseService() => _instance;
   FirebaseService._internal();
 
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  // Local in-memory storage (resets on app restart)
+  final List<Map<String, dynamic>> _timeEntries = [];
+  final List<Map<String, dynamic>> _tasks = [];
+  final List<Map<String, dynamic>> _notes = [];
 
-  /// Save a time entry (start/stop/log)
+  /// Save a time entry (mock)
   Future<void> saveTimeEntry(Map<String, dynamic> data) async {
-    try {
-      await _db.collection('time_entries').add({
-        'action': data['action'] ?? 'unknown',
-        'note': data['note'],
-        'tags': data['tags'] is List ? List<String>.from(data['tags']) : [],
-        'start_time': data['start'],
-        'end_time': data['end'],
-        'status': data['action'] == 'stop' ? 'completed' : 'active',
-        'created_at': FieldValue.serverTimestamp(),
-      });
-      _log('✅ Saved to Firestore: time_entries');
-    } catch (e) {
-      _log('❌ Firestore error: $e');
-    }
+    final entry = {
+      'action': data['action'] ?? 'unknown',
+      'note': data['note'],
+      'tags': _safeStringList(data['tags']),
+      'start_time': data['start'],
+      'end_time': data['end'],
+      'status': data['action'] == 'stop' ? 'completed' : 'active',
+      'created_at': DateTime.now().toIso8601String(),
+      'id': DateTime.now().millisecondsSinceEpoch, // simple mock ID
+    };
+    _timeEntries.add(entry);
+    _log('🕐 [MOCK] Time entry saved: ${entry['id']}');
+    _log('   └─ ${jsonEncode(entry)}');
   }
 
-  /// Save a task
+  /// Save a task (mock)
   Future<void> saveTask(Map<String, dynamic> data) async {
-    try {
-      await _db.collection('tasks').add({
-        'action': data['action'] ?? 'unknown',
-        'title': data['title'] ?? data['note'],
-        'priority': data['priority'],
-        'due': data['due'],
-        'status': data['action'] == 'complete' ? 'done' : 'pending',
-        'created_at': FieldValue.serverTimestamp(),
-      });
-      _log('✅ Saved to Firestore: tasks');
-    } catch (e) {
-      _log('❌ Firestore error: $e');
+    final task = {
+      'action': data['action'] ?? 'unknown',
+      'title': data['title'] ?? data['note'],
+      'priority': data['priority'],
+      'due': data['due'],
+      'status': data['action'] == 'complete' ? 'done' : 'pending',
+      'created_at': DateTime.now().toIso8601String(),
+      'id': DateTime.now().millisecondsSinceEpoch,
+    };
+    _tasks.add(task);
+    _log('✅ [MOCK] Task saved: ${task['title']}');
+  }
+
+  /// Save a note (mock)
+  Future<void> saveNote(Map<String, dynamic> data) async {
+    final note = {
+      'title': data['title'],
+      'content': data['content'] ?? data['note'],
+      'tags': _safeStringList(data['tags']),
+      'created_at': DateTime.now().toIso8601String(),
+      'id': DateTime.now().millisecondsSinceEpoch,
+    };
+    _notes.add(note);
+    _log('🗒️ [MOCK] Note saved: ${note['title'] ?? 'Untitled'}');
+  }
+
+  // Helper: Ensure tags is List<String>
+  List<String> _safeStringList(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.whereType<String>().toList();
+    }
+    if (value is String) return [value];
+    return [];
+  }
+
+  // Helper: View mock data (for debugging)
+  List<Map<String, dynamic>> getMockData(String collection) {
+    switch (collection) {
+      case 'time_entries': return List.unmodifiable(_timeEntries);
+      case 'tasks': return List.unmodifiable(_tasks);
+      case 'notes': return List.unmodifiable(_notes);
+      default: return [];
     }
   }
 
-  /// Save a note
-  Future<void> saveNote(Map<String, dynamic> data) async {
-    try {
-      await _db.collection('notes').add({
-        'title': data['title'],
-        'content': data['content'] ?? data['note'],
-        'tags': data['tags'] is List ? List<String>.from(data['tags']) : [],
-        'created_at': FieldValue.serverTimestamp(),
-      });
-      _log('✅ Saved to Firestore: notes');
-    } catch (e) {
-      _log('❌ Firestore error: $e');
-    }
+  // Helper: Get counts
+  Map<String, int> getStats() {
+    return {
+      'time_entries': _timeEntries.length,
+      'tasks': _tasks.length,
+      'notes': _notes.length,
+    };
   }
 
   void _log(String message) {
-    if (kDebugMode) debugPrint('🔥 FirebaseService: $message');
+    if (kDebugMode) debugPrint('🧪 MockFirebase: $message');
+  }
+
+  // Clear all mock data (for testing)
+  void clearAll() {
+    _timeEntries.clear();
+    _tasks.clear();
+    _notes.clear();
+    _log('🗑️ Mock data cleared');
   }
 }

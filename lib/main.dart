@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
+// Firebase imports removed for local testing
+// import 'package:firebase_core/firebase_core.dart';
 import 'screens/chat_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 🔥 Firebase initialization REMOVED for local testing
+  /*
   await Firebase.initializeApp(
     options: const FirebaseOptions(
       apiKey: "AIzaSyDl4HbWUi2E5CVS5y1699zE2OYhgeNPyY0",
@@ -13,6 +16,7 @@ void main() async {
       projectId: "telegraph-db",
     ),
   );
+  */
 
   runApp(const ChatApp());
 }
@@ -30,6 +34,9 @@ class ChatApp extends StatelessWidget {
         appBarTheme: AppBarTheme(
           backgroundColor: Colors.grey[900],
           elevation: 0,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          hintStyle: TextStyle(color: Colors.grey[500]),
         ),
       ),
       home: const ChatScreen(),
