@@ -1,7 +1,6 @@
 // lib/services/parser_manager.dart
-import 'dart:convert';
 import 'parsers/ai_parser.dart';
-import 'parsers/manual_parser.dart'; // ✅ Correct relative import
+import 'parsers/manual_parser.dart';
 import 'module_manager.dart';
 
 class ParserManager {
@@ -10,7 +9,7 @@ class ParserManager {
   ParserManager._internal();
 
   late AIParser _aiParser;
-  late ManualParser _manualParser; // ✅ Now recognized
+  late ManualParser _manualParser;
   late ModuleManager _moduleManager;
   bool _initialized = false;
 
@@ -21,7 +20,7 @@ class ParserManager {
   void init() {
     if (_initialized) return;
     _aiParser = AIParser();
-    _manualParser = ManualParser(); // ✅ Now recognized
+    _manualParser = ManualParser();
     _moduleManager = ModuleManager();
     _moduleManager.init();
     _initialized = true;
@@ -45,30 +44,23 @@ class ParserManager {
       parsedData = await _aiParser.parse(message, timestamp, dayOfWeek);
     }
 
-    // ✅ Await async route (if you made ModuleManager.route async)
+    // ✅ Await async route
     final moduleResponse = await _moduleManager.route(parsedData, timestamp);
 
-    return _formatResponse(parsedData, moduleResponse);
+    // ✅ Only return meaningful feedback (no JSON debug output)
+    return _formatResponse(moduleResponse);
   }
 
   bool _isManualRoute(String message) {
     return message.trim().startsWith('@');
   }
 
-  String _formatResponse(
-    Map<String, dynamic> parsedData,
-    String? moduleResponse,
-  ) {
-    final buffer = StringBuffer();
-    final jsonOutput = const JsonEncoder.withIndent('  ').convert(parsedData);
-    buffer.write('📦 **Parsed Data**:\n```json\n$jsonOutput\n```\n');
-
+  /// ✅ Clean response: Only show module feedback, no debug JSON
+  String _formatResponse(String? moduleResponse) {
     if (moduleResponse != null && moduleResponse.isNotEmpty) {
-      buffer.write('\n$moduleResponse');
-    } else {
-      buffer.write('\n⚠️ No module response');
+      return moduleResponse;
     }
-    return buffer.toString();
+    return '⚠️ No response from module';
   }
 
   Map<String, dynamic> getStats() {
