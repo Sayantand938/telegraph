@@ -1,6 +1,7 @@
 // lib/services/module_manager.dart
 import 'modules/base_module.dart';
-import 'modules/time_module.dart';
+// ✅ Updated import path for refactored TimeModule
+import 'modules/time_module/time_module.dart';
 import 'modules/task_module.dart';
 import 'modules/note_module.dart';
 import 'modules/chat_module.dart';
@@ -33,14 +34,11 @@ class ModuleManager {
     DateTime timestamp,
   ) async {
     if (!_initialized) init();
-
     final targetModule = parsedData['target_module'] as String? ?? 'chat';
     final module = _modules[targetModule];
-
     if (module == null) {
       return '❌ Module "$targetModule" not found. Available: ${_modules.keys.join(", ")}';
     }
-
     // ✅ CHANGE 2: Await the async handle method
     return await module.handle(parsedData, timestamp);
   }
