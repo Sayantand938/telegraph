@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../services/parser_manager.dart';
-import '../services/firebase_service.dart'; // Now points to mock
 import 'package:flutter/foundation.dart';
 import '../widgets/custom_app_bar.dart';
 import '../widgets/chat_bubble.dart';
@@ -20,8 +19,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   final ParserManager _parserManager = ParserManager();
-  final FirebaseService _firebase = FirebaseService(); // Mock instance
-
+  
   final List<Message> _messages = [];
   bool _isBotTyping = false;
 
@@ -29,12 +27,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _parserManager.init();
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
     });
-
-    // Welcome message
     _addBotMessage(
       '👋 Welcome to Telegraph!\n\n'
       'Try commands:\n'
@@ -67,7 +62,6 @@ class _ChatScreenState extends State<ChatScreen> {
     final timestamp = DateTime.now();
     final isManual = text.startsWith('@');
 
-    // Add user message
     setState(() {
       _messages.add(Message(text: text, isUser: true, timestamp: timestamp));
       _controller.clear();
@@ -76,27 +70,20 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
     _focusNode.requestFocus();
 
-    // Process message
     _parserManager.processMessage(text, timestamp);
 
-    // Show response after short delay (simulates processing)
     Future.delayed(const Duration(milliseconds: 300), () {
       if (!mounted) return;
-
       final String response;
       if (isManual) {
-        // Show mock confirmation based on command
         final cleaned = text.substring(1).trim();
         final tokens = cleaned.split(RegExp(r'\s+'));
         final module = tokens.isNotEmpty ? tokens[0] : 'unknown';
-        
-        response = '✅ [$module] Processed locally\n'
-            '📊 Stats: ${_firebase.getStats()}';
+        // ✅ Simple confirmation - no service calls
+        response = '✅ [$module] Command processed locally';
       } else {
-        response = '🤖 [AI Mode] Received: "$text"\n'
-            '(LLM integration pending)';
+        response = '🤖 [AI Mode] Received: "$text"\n(LLM integration pending)';
       }
-
       setState(() {
         _messages.add(Message(text: response, isUser: false));
         _isBotTyping = false;
@@ -150,24 +137,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 _showParserStats();
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.storage, color: Colors.white),
-              title: const Text('View Mock Data', style: TextStyle(color: Colors.white)),
-              onTap: () {
-                Navigator.pop(context);
-                _showMockData();
-              },
-            ),
+            // ✅ "View Mock Data" removed - no data service exists
             if (kDebugMode) ...[
               Divider(color: Colors.grey[700]),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text('Clear Mock Data', style: TextStyle(color: Colors.red)),
-                onTap: () {
-                  Navigator.pop(context);
-                  _firebase.clearAll();
-                  _addBotMessage('🗑️ Mock data cleared');
-                },
+                leading: const Icon(Icons.info, color: Colors.grey),
+                title: const Text('Local Mode Active', style: TextStyle(color: Colors.grey)),
+                enabled: false,
               ),
             ],
           ],
@@ -217,41 +193,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  void _showMockData() {
-    final stats = _firebase.getStats();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[850],
-        title: const Text(
-          'Mock Data Store',
-          style: TextStyle(color: Colors.white, fontFamily: 'JetBrains Mono'),
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildStatRow('Time Entries', '${stats['time_entries']}'),
-              _buildStatRow('Tasks', '${stats['tasks']}'),
-              _buildStatRow('Notes', '${stats['notes']}'),
-              const SizedBox(height: 16),
-              const Text(
-                'Data is stored in-memory only.\nResets when app restarts.',
-                style: TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close', style: TextStyle(color: Colors.blue)),
-          ),
-        ],
-      ),
-    );
-  }
+  // ✅ _showMockData() completely removed - no data service
 
   Widget _buildStatRow(String label, String value) {
     return Padding(
@@ -259,8 +201,23 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[400], fontFamily: 'JetBrains Mono', fontSize: 13)),
-          Text(value, style: const TextStyle(color: Colors.white, fontFamily: 'JetBrains Mono', fontWeight: FontWeight.w500, fontSize: 13)),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontFamily: 'JetBrains Mono',
+              fontSize: 13,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'JetBrains Mono',
+              fontWeight: FontWeight.w500,
+              fontSize: 13,
+            ),
+          ),
         ],
       ),
     );
@@ -269,7 +226,11 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CustomAppBar(title: 'Echo Bot', isTyping: _isBotTyping, onMenuPressed: _showMenu),
+      appBar: CustomAppBar(
+        title: 'Echo Bot',
+        isTyping: _isBotTyping,
+        onMenuPressed: _showMenu,
+      ),
       backgroundColor: Colors.grey[900],
       body: Column(
         children: [
@@ -283,7 +244,11 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           if (_isBotTyping) const TypingIndicator(),
           Divider(color: Colors.grey[800], height: 1),
-          ChatInput(controller: _controller, focusNode: _focusNode, onSend: _sendMessage),
+          ChatInput(
+            controller: _controller,
+            focusNode: _focusNode,
+            onSend: _sendMessage,
+          ),
         ],
       ),
     );

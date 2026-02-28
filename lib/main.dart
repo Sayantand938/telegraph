@@ -1,23 +1,8 @@
 import 'package:flutter/material.dart';
-// Firebase imports removed for local testing
-// import 'package:firebase_core/firebase_core.dart';
 import 'screens/chat_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 🔥 Firebase initialization REMOVED for local testing
-  /*
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: "AIzaSyDl4HbWUi2E5CVS5y1699zE2OYhgeNPyY0",
-      appId: "1:429119712284:web:21c0b8d562816ecc3b43d9",
-      messagingSenderId: "429119712284",
-      projectId: "telegraph-db",
-    ),
-  );
-  */
-
   runApp(const ChatApp());
 }
 
