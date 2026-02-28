@@ -44,7 +44,7 @@ class TimeModule extends BaseModule {
       case 'status':
         return await _statusCommand.execute();
       case 'list':
-        return await _listCommand.execute();
+        return await _listCommand.execute(data, timestamp);
       default:
         return '❌ Unknown action: "$action". Try: start, stop, add, status, list';
     }
