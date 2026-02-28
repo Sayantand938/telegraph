@@ -62,8 +62,8 @@ class ModuleManager {
       return;
     }
 
-    // Route to module
-    _logDebug('🎯 Routing to module: $targetModule');
+    // ✅ Route to module (changed "Routing" → "Routed")
+    _logDebug('🎯 Routed to module: $targetModule');
     module.handle(parsedData, timestamp);
   }
 
