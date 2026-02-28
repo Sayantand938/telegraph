@@ -1,5 +1,5 @@
-import 'parsers/ai_parser.dart';      // ✅ Added import
-import 'parsers/manual_parser.dart';  // ✅ Added import
+import 'parsers/ai_parser.dart';
+import 'parsers/manual_parser.dart';
 
 /// Main router that delegates to appropriate parser
 class ParserManager {
@@ -52,6 +52,7 @@ class ParserManager {
       'aiParser': _initialized ? 'Active' : 'Not initialized',
       'manualParser': _initialized ? 'Active' : 'Not initialized',
       'manualTrigger': '@',
+      'workerUrl': 'https://telegraph-ai-worker.sayantand938.workers.dev/',
       'stats': {
         'totalProcessed': _totalProcessed,
         'aiRouteCount': _aiRouteCount,
