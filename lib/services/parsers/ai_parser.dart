@@ -4,8 +4,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import 'base_parser.dart';
 
-/// Dumb AI Parser
-/// Returns raw JSON from worker + minimal envelope. No field enforcement.
+/// AI Parser that mirrors the worker output
+/// Assumes worker already returns only JSON with all AI fields
 class AIParser extends BaseParser {
   static const String _workerUrl =
       'https://telegraph-ai-worker.sayantand938.workers.dev/';
@@ -35,25 +35,37 @@ class AIParser extends BaseParser {
 
       if (response.statusCode != 200) {
         return {
-          'source': 'ai',
+          'target_module': 'chat',
+          'action': 'error',
           'error': 'Worker status ${response.statusCode}',
         };
       }
 
       final responseData = jsonDecode(response.body);
       if (responseData is! Map<String, dynamic>) {
-        return {'source': 'ai', 'error': 'Invalid response format'};
+        return {
+          'target_module': 'chat',
+          'action': 'error',
+          'error': 'Invalid response format',
+        };
       }
 
-      // ✅ Envelope raw data with minimal context, do not constrain fields
-      return {
-        'source': 'ai',
-        'timestamp': timestamp.toIso8601String(),
-        'day_of_week': dayOfWeek,
-        ...responseData, // Spread all AI-generated fields directly
-      };
+      // ✅ Envelope: add timestamp and day_of_week
+      responseData['timestamp'] = timestamp.toIso8601String();
+      responseData['day_of_week'] = dayOfWeek;
+
+      // ✅ Safeguard: ensure target_module exists
+      if (!responseData.containsKey('target_module')) {
+        responseData['target_module'] = 'chat';
+      }
+
+      return responseData;
     } catch (e) {
-      return {'source': 'ai', 'error': e.toString()};
+      return {
+        'target_module': 'chat',
+        'action': 'error',
+        'error': e.toString(),
+      };
     }
   }
 }

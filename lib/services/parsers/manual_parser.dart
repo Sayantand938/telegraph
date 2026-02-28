@@ -1,85 +1,104 @@
-import 'base_parser.dart';
+import 'dart:core';
 
-/// Dumb Manual Parser
-/// Extracts key-value pairs. Does not enforce specific fields like 'action'.
-class ManualParser extends BaseParser {
-  ManualParser() : super('Manual Parser');
-
-  @override
-  Future<Map<String, dynamic>> parse(
+/// Dumb Strict Manual Parser with quoted value support
+/// Rules:
+/// - target_module is the token starting with @ (strip @)
+/// - Only tokens starting with -- are keys
+/// - Value is the next token after the key, or null if missing
+/// - If value is quoted ("") allow spaces inside
+/// - Special handling: tags always become a list, even single element
+/// - Adds timestamp and day_of_week
+class ManualParser {
+  Map<String, dynamic> parse(
     String message,
     DateTime timestamp,
     String dayOfWeek,
-  ) async {
-    final cleaned = stripManualTrigger(message);
-    final tokens = _tokenize(cleaned);
+  ) {
+    final tokens = _tokenize(message);
+    if (tokens.isEmpty) return {};
+
     final result = <String, dynamic>{};
 
-    // ✅ Extract potential module from first token (syntax parsing)
-    if (tokens.isNotEmpty) {
-      result['target_module'] = tokens[0];
+    // 1️⃣ Extract target_module
+    final targetIndex = tokens.indexWhere((t) => t.startsWith('@'));
+    if (targetIndex != -1) {
+      result['target_module'] = tokens[targetIndex].substring(1); // strip @
+      tokens.removeAt(targetIndex);
+    } else {
+      result['target_module'] = 'chat'; // default fallback
     }
 
-    // ✅ Parse remaining flags (--key value)
-    int i = 1;
-    while (i < tokens.length) {
+    // 2️⃣ Parse flags only
+    for (int i = 0; i < tokens.length; i++) {
       final token = tokens[i];
       if (token.startsWith('--')) {
         final key = token.substring(2);
-        i++;
-        final valueParts = <String>[];
-        while (i < tokens.length && !tokens[i].startsWith('--')) {
-          valueParts.add(tokens[i]);
-          i++;
+        String? value;
+
+        // take next token if exists and it's NOT a flag
+        if (i + 1 < tokens.length && !tokens[i + 1].startsWith('--')) {
+          value = tokens[i + 1];
+          i++; // skip next token
         }
-        result[key] = valueParts.isEmpty
-            ? true
-            : _parseValue(valueParts.join(' '));
-      } else {
-        // Non-flag tokens are just passed as data (e.g., action)
-        if (!result.containsKey('action')) {
-          result['action'] = token;
+
+        // 3️⃣ Remove quotes if present
+        if (value != null &&
+            value.length >= 2 &&
+            value.startsWith('"') &&
+            value.endsWith('"')) {
+          value = value.substring(1, value.length - 1);
         }
-        i++;
+
+        // 4️⃣ Special handling for tags
+        if (key.toLowerCase() == 'tags') {
+          if (value == null || value.trim().isEmpty) {
+            result[key] = <String>[]; // empty list
+          } else {
+            result[key] = value
+                .split(',')
+                .map((t) => t.trim())
+                .where((t) => t.isNotEmpty)
+                .toList();
+          }
+        } else {
+          result[key] = value; // null if missing
+        }
       }
     }
 
-    // ✅ Envelope with minimal context
-    return {
-      'source': 'manual',
-      'timestamp': timestamp.toIso8601String(),
-      'day_of_week': dayOfWeek,
-      ...result,
-    };
+    // 5️⃣ Envelope
+    result['timestamp'] = timestamp.toIso8601String();
+    result['day_of_week'] = dayOfWeek;
+
+    return result;
   }
 
+  /// Tokenizes message but keeps quoted strings together
   List<String> _tokenize(String message) {
-    final tokens = <String>[];
     final regex = RegExp(r'"[^"]*"|\S+');
+    final tokens = <String>[];
     for (final match in regex.allMatches(message)) {
       var token = match.group(0)!;
-      if (token.startsWith('"') && token.endsWith('"') && token.length >= 2) {
-        token = token.substring(1, token.length - 1);
-      }
-      if (token.isNotEmpty) tokens.add(token);
+      tokens.add(token);
     }
     return tokens;
   }
+}
 
-  dynamic _parseValue(String value) {
-    final trimmed = value.trim();
-    final lower = trimmed.toLowerCase();
-    if (lower == 'true') return true;
-    if (lower == 'false') return false;
-    final numVal = num.tryParse(trimmed);
-    if (numVal != null) return numVal;
-    if (trimmed.contains(',')) {
-      return trimmed
-          .split(',')
-          .map((v) => v.trim())
-          .where((v) => v.isNotEmpty)
-          .toList();
-    }
-    return trimmed;
-  }
+/// Example usage
+void main() {
+  final parser = ManualParser();
+
+  final msg1 =
+      '@time --action start --note "I am working on project" --tags abc,xyz';
+  final parsed1 = parser.parse(msg1, DateTime.now(), 'Monday');
+  print(parsed1);
+
+  final msg2 = '@time --action start --note --tags abc';
+  final parsed2 = parser.parse(msg2, DateTime.now(), 'Monday');
+  print(parsed2);
+
+  final msg3 = '@chat --verbose --tags';
+  final parsed3 = parser.parse(msg3, DateTime.now(), 'Tuesday');
+  print(parsed3);
 }

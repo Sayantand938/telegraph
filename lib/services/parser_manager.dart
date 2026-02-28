@@ -46,7 +46,7 @@ class ParserManager {
     // Step 1: Parse message (AI or Manual)
     if (_isManualRoute(message)) {
       _manualRouteCount++;
-      parsedData = await _manualParser.parse(message, timestamp, dayOfWeek);
+      parsedData = _manualParser.parse(message, timestamp, dayOfWeek);
     } else {
       _aiRouteCount++;
       parsedData = await _aiParser.parse(message, timestamp, dayOfWeek);

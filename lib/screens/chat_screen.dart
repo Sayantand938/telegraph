@@ -33,9 +33,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _addBotMessage(
       '👋 Welcome to Telegraph!\n\n'
       'Try commands:\n'
-      '• @time start --note "Work" --tags dev,flutter\n'
-      '• @task add --title "Fix bug" --priority high\n'
-      '• @note --title Ideas --content "Add export feature"\n\n'
+      '• @time --action start --note "Work" --tags dev,flutter\n'
       'Start with @ for manual mode, or type normally for AI mode.',
     );
   }
