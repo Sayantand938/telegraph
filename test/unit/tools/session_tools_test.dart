@@ -50,36 +50,36 @@ void main() {
             .execute({'notes': 'Test session'});
 
         // Assert
-        expect(result, contains('Session started with ID: 1'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Session started with ID: 1'));
       });
 
       test('validates start_time format', () async {
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'start_session')
+            .execute({'start_time': 'invalid-date'});
+
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<ValidationException>());
         expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'start_session')
-              .execute({'start_time': 'invalid-date'}),
-          throwsA(
-            isA<ValidationException>().having(
-              (e) => e.code,
-              'code',
-              'INVALID_DATE_FORMAT',
-            ),
-          ),
+          (failureResult.error as ValidationException).code,
+          'INVALID_DATE_FORMAT',
         );
       });
 
       test('validates end_time format when provided', () async {
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'start_session')
+            .execute({'end_time': 'invalid-date'});
+
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<ValidationException>());
         expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'start_session')
-              .execute({'end_time': 'invalid-date'}),
-          throwsA(
-            isA<ValidationException>().having(
-              (e) => e.code,
-              'code',
-              'INVALID_DATE_FORMAT',
-            ),
-          ),
+          (failureResult.error as ValidationException).code,
+          'INVALID_DATE_FORMAT',
         );
       });
 
@@ -89,18 +89,18 @@ void main() {
           (_) async => Result.success([SessionFixtures.activeSession()]),
         );
 
-        // Act & Assert
+        // Act
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'start_session')
+            .execute({});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<BusinessLogicException>());
         expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'start_session')
-              .execute({}),
-          throwsA(
-            isA<BusinessLogicException>().having(
-              (e) => e.code,
-              'code',
-              'ACTIVE_SESSION_EXISTS',
-            ),
-          ),
+          (failureResult.error as BusinessLogicException).code,
+          'ACTIVE_SESSION_EXISTS',
         );
       });
 
@@ -113,18 +113,18 @@ void main() {
           () => mockSessionRepo.hasOverlap(any(), any()),
         ).thenAnswer((_) async => Result.success(true));
 
-        // Act & Assert
+        // Act
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'start_session')
+            .execute({});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<BusinessLogicException>());
         expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'start_session')
-              .execute({}),
-          throwsA(
-            isA<BusinessLogicException>().having(
-              (e) => e.code,
-              'code',
-              'SESSION_OVERLAP',
-            ),
-          ),
+          (failureResult.error as BusinessLogicException).code,
+          'SESSION_OVERLAP',
         );
       });
 
@@ -147,13 +147,16 @@ void main() {
               Result.failure(DatabaseException('DB error', code: 'DB_ERROR')),
         );
 
-        // Act & Assert
-        expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'start_session')
-              .execute({'notes': 'Test session'}),
-          throwsA(isA<DatabaseException>()),
-        );
+        // Act
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'start_session')
+            .execute({'notes': 'Test session'});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<DatabaseException>());
+        expect((failureResult.error as DatabaseException).code, 'DB_ERROR');
       });
     });
 
@@ -183,7 +186,12 @@ void main() {
             .execute({'notes': 'Ending session'});
 
         // Assert
-        expect(result, contains('Active session ended successfully'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(
+          successResult.value,
+          contains('Active session ended successfully'),
+        );
       });
 
       test('throws NotFoundException when no active session found', () async {
@@ -195,18 +203,18 @@ void main() {
           () => mockSessionRepo.endActiveSession(notes: any(named: 'notes')),
         ).thenAnswer((_) async => Result.success(null));
 
-        // Act & Assert
+        // Act
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'end_session')
+            .execute({});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<NotFoundException>());
         expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'end_session')
-              .execute({}),
-          throwsA(
-            isA<NotFoundException>().having(
-              (e) => e.code,
-              'code',
-              'NO_ACTIVE_SESSION',
-            ),
-          ),
+          (failureResult.error as NotFoundException).code,
+          'NO_ACTIVE_SESSION',
         );
       });
 
@@ -237,7 +245,9 @@ void main() {
             .execute({});
 
         // Assert
-        expect(result, contains('split into 3 daily sessions'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('split into 3 daily sessions'));
       });
     });
 
@@ -258,9 +268,11 @@ void main() {
             .execute({});
 
         // Assert
-        expect(result, contains('Sessions:'));
-        expect(result, contains('ID: 1'));
-        expect(result, contains('ID: 2'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Sessions:'));
+        expect(successResult.value, contains('ID: 1'));
+        expect(successResult.value, contains('ID: 2'));
       });
 
       test('filters active sessions when status=active', () async {
@@ -283,8 +295,10 @@ void main() {
             .execute({'status': 'active'});
 
         // Assert
-        expect(result, contains('ID: 1'));
-        expect(result, isNot(contains('ID: 2')));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('ID: 1'));
+        expect(successResult.value, isNot(contains('ID: 2')));
       });
 
       test('filters completed sessions when status=completed', () async {
@@ -307,8 +321,10 @@ void main() {
             .execute({'status': 'completed'});
 
         // Assert
-        expect(result, contains('ID: 2'));
-        expect(result, isNot(contains('ID: 1')));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('ID: 2'));
+        expect(successResult.value, isNot(contains('ID: 1')));
       });
 
       test('returns "No sessions found" when empty', () async {
@@ -323,7 +339,9 @@ void main() {
             .execute({});
 
         // Assert
-        expect(result, contains('No sessions found'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('No sessions found'));
       });
     });
 
@@ -341,9 +359,11 @@ void main() {
             .execute({'session_id': 1});
 
         // Assert
-        expect(result, contains('Session 1:'));
-        expect(result, contains('Start:'));
-        expect(result, contains('End:'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Session 1:'));
+        expect(successResult.value, contains('Start:'));
+        expect(successResult.value, contains('End:'));
       });
 
       test('throws NotFoundException when session does not exist', () async {
@@ -352,18 +372,18 @@ void main() {
           () => mockSessionRepo.getSession(999),
         ).thenAnswer((_) async => Result.success(null));
 
-        // Act & Assert
+        // Act
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'get_session')
+            .execute({'session_id': 999});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<NotFoundException>());
         expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'get_session')
-              .execute({'session_id': 999}),
-          throwsA(
-            isA<NotFoundException>().having(
-              (e) => e.code,
-              'code',
-              'SESSION_NOT_FOUND',
-            ),
-          ),
+          (failureResult.error as NotFoundException).code,
+          'SESSION_NOT_FOUND',
         );
       });
     });
@@ -381,7 +401,9 @@ void main() {
             .execute({'session_id': 1});
 
         // Assert
-        expect(result, contains('Session 1 deleted successfully'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Session 1 deleted successfully'));
       });
 
       test('throws NotFoundException when session does not exist', () async {
@@ -390,18 +412,18 @@ void main() {
           () => mockSessionRepo.deleteSession(999),
         ).thenAnswer((_) async => Result.success(0));
 
-        // Act & Assert
+        // Act
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'delete_session')
+            .execute({'session_id': 999});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<NotFoundException>());
         expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'delete_session')
-              .execute({'session_id': 999}),
-          throwsA(
-            isA<NotFoundException>().having(
-              (e) => e.code,
-              'code',
-              'SESSION_NOT_FOUND',
-            ),
-          ),
+          (failureResult.error as NotFoundException).code,
+          'SESSION_NOT_FOUND',
         );
       });
     });
@@ -429,7 +451,9 @@ void main() {
             .execute({});
 
         // Assert
-        expect(result, contains('Active Session ID: 2'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Active Session ID: 2'));
       });
 
       test('throws NotFoundException when no active session exists', () async {
@@ -438,18 +462,18 @@ void main() {
           () => mockSessionRepo.getMostRecentActiveSession(),
         ).thenAnswer((_) async => Result.success(null));
 
-        // Act & Assert
+        // Act
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'get_active_session')
+            .execute({});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<NotFoundException>());
         expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'get_active_session')
-              .execute({}),
-          throwsA(
-            isA<NotFoundException>().having(
-              (e) => e.code,
-              'code',
-              'NO_ACTIVE_SESSION',
-            ),
-          ),
+          (failureResult.error as NotFoundException).code,
+          'NO_ACTIVE_SESSION',
         );
       });
     });
@@ -474,7 +498,12 @@ void main() {
             .execute({'session_id': 1, 'notes': 'New notes'});
 
         // Assert
-        expect(result, contains('Session 1 notes updated successfully'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(
+          successResult.value,
+          contains('Session 1 notes updated successfully'),
+        );
       });
 
       test('appends notes when append=true and existing notes exist', () async {
@@ -496,9 +525,11 @@ void main() {
             .execute({'session_id': 1, 'notes': 'Added later', 'append': true});
 
         // Assert
-        expect(result, contains('Current notes:'));
-        expect(result, contains('Original'));
-        expect(result, contains('Added later'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Current notes:'));
+        expect(successResult.value, contains('Original'));
+        expect(successResult.value, contains('Added later'));
       });
 
       test('overwrites notes when append=false', () async {
@@ -520,9 +551,11 @@ void main() {
             .execute({'session_id': 1, 'notes': 'New notes', 'append': false});
 
         // Assert
-        expect(result, contains('Current notes:'));
-        expect(result, contains('New notes'));
-        expect(result, isNot(contains('Original')));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Current notes:'));
+        expect(successResult.value, contains('New notes'));
+        expect(successResult.value, isNot(contains('Original')));
       });
 
       test('throws NotFoundException when session not found', () async {
@@ -531,18 +564,18 @@ void main() {
           () => mockSessionRepo.getSession(999),
         ).thenAnswer((_) async => Result.success(null));
 
-        // Act & Assert
+        // Act
+        final result = await sessionTools
+            .firstWhere((t) => t.name == 'update_session_notes')
+            .execute({'session_id': 999, 'notes': 'Notes'});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<NotFoundException>());
         expect(
-          () async => await sessionTools
-              .firstWhere((t) => t.name == 'update_session_notes')
-              .execute({'session_id': 999, 'notes': 'Notes'}),
-          throwsA(
-            isA<NotFoundException>().having(
-              (e) => e.code,
-              'code',
-              'SESSION_NOT_FOUND',
-            ),
-          ),
+          (failureResult.error as NotFoundException).code,
+          'SESSION_NOT_FOUND',
         );
       });
     });

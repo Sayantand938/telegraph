@@ -4,7 +4,7 @@ import 'package:telegraph/core/errors/result.dart';
 
 /// High-level repository interface for session operations.
 /// Abstracts away database implementation details from business logic.
-/// All methods return Result<T> for type-safe error handling.
+/// All methods return `Result<T>` for type-safe error handling.
 abstract class ISessionRepository {
   /// Creates a new session
   Future<Result<int>> createSession({

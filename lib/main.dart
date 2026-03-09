@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:telegraph/core/config/app_config.dart';
 import 'package:telegraph/core/config/platform_config.dart';
@@ -27,7 +28,7 @@ Future<void> main() async {
   // Initialize dependency injection with configuration
   await configureDependencies(config);
 
-  runApp(const TerminalApp());
+  runApp(const ProviderScope(child: TerminalApp()));
 }
 
 /// Detect platform-specific configuration

@@ -5,8 +5,6 @@ import 'package:telegraph/services/repositories/i_session_repository.dart';
 import 'package:telegraph/services/repositories/i_finance_repository.dart';
 import 'package:telegraph/models/session.dart';
 import 'package:telegraph/models/finance_transaction.dart';
-import 'package:telegraph/core/errors/result.dart';
-import 'package:telegraph/core/errors/exceptions.dart';
 
 class MockSessionDatabase extends Mock implements ISessionDatabase {}
 

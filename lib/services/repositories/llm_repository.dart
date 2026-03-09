@@ -4,7 +4,7 @@ import 'package:telegraph/core/errors/result.dart';
 /// Repository interface for LLM operations.
 /// This abstraction enables easy mocking for testing and allows
 /// swapping LLM implementations without affecting business logic.
-/// All methods return Result<T> for type-safe error handling.
+/// All methods return `Result<T>` for type-safe error handling.
 abstract class ILlmRepository {
   /// Sends a message to the LLM and returns a response.
   /// [message] - The user's message

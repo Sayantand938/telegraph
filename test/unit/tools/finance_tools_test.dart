@@ -51,9 +51,11 @@ void main() {
             });
 
         // Assert
-        expect(result, contains('Income transaction recorded'));
-        expect(result, contains('ID: 1'));
-        expect(result, contains('\$150.00'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Income transaction recorded'));
+        expect(successResult.value, contains('ID: 1'));
+        expect(successResult.value, contains('\$150.00'));
       });
 
       test('adds expense transaction successfully', () async {
@@ -68,44 +70,46 @@ void main() {
             .execute({'type': 'expense', 'amount': 75.50});
 
         // Assert
-        expect(result, contains('Expense transaction recorded'));
-        expect(result, contains('ID: 2'));
-        expect(result, contains('\$75.50'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Expense transaction recorded'));
+        expect(successResult.value, contains('ID: 2'));
+        expect(successResult.value, contains('\$75.50'));
       });
 
       test('validates amount is positive', () async {
-        // Act & Assert
+        // Act
+        final result = await financeTools
+            .firstWhere((t) => t.name == 'add_transaction')
+            .execute({'type': 'income', 'amount': -50.0});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<ValidationException>());
         expect(
-          () async => await financeTools
-              .firstWhere((t) => t.name == 'add_transaction')
-              .execute({'type': 'income', 'amount': -50.0}),
-          throwsA(
-            isA<ValidationException>().having(
-              (e) => e.code,
-              'code',
-              'INVALID_AMOUNT',
-            ),
-          ),
+          (failureResult.error as ValidationException).code,
+          'INVALID_AMOUNT',
         );
       });
 
       test('validates transaction_time format when provided', () async {
-        // Act & Assert
+        // Act
+        final result = await financeTools
+            .firstWhere((t) => t.name == 'add_transaction')
+            .execute({
+              'type': 'income',
+              'amount': 100.0,
+              'transaction_time': 'invalid-date',
+            });
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<ValidationException>());
         expect(
-          () async => await financeTools
-              .firstWhere((t) => t.name == 'add_transaction')
-              .execute({
-                'type': 'income',
-                'amount': 100.0,
-                'transaction_time': 'invalid-date',
-              }),
-          throwsA(
-            isA<ValidationException>().having(
-              (e) => e.code,
-              'code',
-              'INVALID_DATE_FORMAT',
-            ),
-          ),
+          (failureResult.error as ValidationException).code,
+          'INVALID_DATE_FORMAT',
         );
       });
 
@@ -121,7 +125,9 @@ void main() {
             .execute({'type': 'expense', 'amount': 25.0});
 
         // Assert
-        expect(result, contains('Expense transaction recorded'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Expense transaction recorded'));
       });
 
       test('handles database failure', () async {
@@ -131,13 +137,16 @@ void main() {
               Result.failure(DatabaseException('DB error', code: 'DB_ERROR')),
         );
 
-        // Act & Assert
-        expect(
-          () async => await financeTools
-              .firstWhere((t) => t.name == 'add_transaction')
-              .execute({'type': 'income', 'amount': 100.0}),
-          throwsA(isA<DatabaseException>()),
-        );
+        // Act
+        final result = await financeTools
+            .firstWhere((t) => t.name == 'add_transaction')
+            .execute({'type': 'income', 'amount': 100.0});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<DatabaseException>());
+        expect((failureResult.error as DatabaseException).code, 'DB_ERROR');
       });
     });
 
@@ -158,11 +167,13 @@ void main() {
             .execute({});
 
         // Assert
-        expect(result, contains('Financial Transactions:'));
-        expect(result, contains('ID 1: [Income]'));
-        expect(result, contains('ID 2: [Expense]'));
-        expect(result, contains('Total Income: +\$100.00'));
-        expect(result, contains('Total Expense: -\$50.00'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Financial Transactions:'));
+        expect(successResult.value, contains('ID 1: [Income]'));
+        expect(successResult.value, contains('ID 2: [Expense]'));
+        expect(successResult.value, contains('Total Income: +\$100.00'));
+        expect(successResult.value, contains('Total Expense: -\$50.00'));
       });
 
       test('filters by type=income', () async {
@@ -185,8 +196,10 @@ void main() {
             .execute({'type': 'income'});
 
         // Assert
-        expect(result, contains('[Income]'));
-        expect(result, isNot(contains('[Expense]')));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('[Income]'));
+        expect(successResult.value, isNot(contains('[Expense]')));
       });
 
       test('filters by type=expense', () async {
@@ -209,8 +222,10 @@ void main() {
             .execute({'type': 'expense'});
 
         // Assert
-        expect(result, contains('[Expense]'));
-        expect(result, isNot(contains('[Income]')));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('[Expense]'));
+        expect(successResult.value, isNot(contains('[Income]')));
       });
 
       test('filters by date range', () async {
@@ -236,8 +251,10 @@ void main() {
             });
 
         // Assert
-        expect(result, contains('Financial Transactions:'));
-        expect(result, contains('ID 1:'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Financial Transactions:'));
+        expect(successResult.value, contains('ID 1:'));
       });
 
       test('returns "No transactions found" when empty', () async {
@@ -252,7 +269,9 @@ void main() {
             .execute({});
 
         // Assert
-        expect(result, contains('No transactions found'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('No transactions found'));
       });
     });
 
@@ -274,10 +293,12 @@ void main() {
             .execute({'transaction_id': 1});
 
         // Assert
-        expect(result, contains('Transaction 1:'));
-        expect(result, contains('Type: Income'));
-        expect(result, contains('\$200.00'));
-        expect(result, contains('Bonus'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Transaction 1:'));
+        expect(successResult.value, contains('Type: Income'));
+        expect(successResult.value, contains('\$200.00'));
+        expect(successResult.value, contains('Bonus'));
       });
 
       test(
@@ -288,18 +309,18 @@ void main() {
             () => mockFinanceRepo.getTransaction(999),
           ).thenAnswer((_) async => Result.success(null));
 
-          // Act & Assert
+          // Act
+          final result = await financeTools
+              .firstWhere((t) => t.name == 'get_transaction')
+              .execute({'transaction_id': 999});
+
+          // Assert
+          expect(result, isA<Failure<String>>());
+          final failureResult = result as Failure<String>;
+          expect(failureResult.error, isA<NotFoundException>());
           expect(
-            () async => await financeTools
-                .firstWhere((t) => t.name == 'get_transaction')
-                .execute({'transaction_id': 999}),
-            throwsA(
-              isA<NotFoundException>().having(
-                (e) => e.code,
-                'code',
-                'TRANSACTION_NOT_FOUND',
-              ),
-            ),
+            (failureResult.error as NotFoundException).code,
+            'TRANSACTION_NOT_FOUND',
           );
         },
       );
@@ -318,7 +339,12 @@ void main() {
             .execute({'transaction_id': 1});
 
         // Assert
-        expect(result, contains('Transaction 1 deleted successfully'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(
+          successResult.value,
+          contains('Transaction 1 deleted successfully'),
+        );
       });
 
       test(
@@ -329,18 +355,18 @@ void main() {
             () => mockFinanceRepo.deleteTransaction(999),
           ).thenAnswer((_) async => Result.success(0));
 
-          // Act & Assert
+          // Act
+          final result = await financeTools
+              .firstWhere((t) => t.name == 'delete_transaction')
+              .execute({'transaction_id': 999});
+
+          // Assert
+          expect(result, isA<Failure<String>>());
+          final failureResult = result as Failure<String>;
+          expect(failureResult.error, isA<NotFoundException>());
           expect(
-            () async => await financeTools
-                .firstWhere((t) => t.name == 'delete_transaction')
-                .execute({'transaction_id': 999}),
-            throwsA(
-              isA<NotFoundException>().having(
-                (e) => e.code,
-                'code',
-                'TRANSACTION_NOT_FOUND',
-              ),
-            ),
+            (failureResult.error as NotFoundException).code,
+            'TRANSACTION_NOT_FOUND',
           );
         },
       );
@@ -370,7 +396,12 @@ void main() {
             });
 
         // Assert
-        expect(result, contains('Transaction 1 updated successfully'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(
+          successResult.value,
+          contains('Transaction 1 updated successfully'),
+        );
       });
 
       test('throws NotFoundException when transaction not found', () async {
@@ -379,18 +410,18 @@ void main() {
           () => mockFinanceRepo.getTransaction(999),
         ).thenAnswer((_) async => Result.success(null));
 
-        // Act & Assert
+        // Act
+        final result = await financeTools
+            .firstWhere((t) => t.name == 'update_transaction')
+            .execute({'transaction_id': 999, 'amount': 100.0});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<NotFoundException>());
         expect(
-          () async => await financeTools
-              .firstWhere((t) => t.name == 'update_transaction')
-              .execute({'transaction_id': 999, 'amount': 100.0}),
-          throwsA(
-            isA<NotFoundException>().having(
-              (e) => e.code,
-              'code',
-              'TRANSACTION_NOT_FOUND',
-            ),
-          ),
+          (failureResult.error as NotFoundException).code,
+          'TRANSACTION_NOT_FOUND',
         );
       });
 
@@ -401,18 +432,18 @@ void main() {
           () => mockFinanceRepo.getTransaction(1),
         ).thenAnswer((_) async => Result.success(existing));
 
-        // Act & Assert
+        // Act
+        final result = await financeTools
+            .firstWhere((t) => t.name == 'update_transaction')
+            .execute({'transaction_id': 1, 'amount': -50.0});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<ValidationException>());
         expect(
-          () async => await financeTools
-              .firstWhere((t) => t.name == 'update_transaction')
-              .execute({'transaction_id': 1, 'amount': -50.0}),
-          throwsA(
-            isA<ValidationException>().having(
-              (e) => e.code,
-              'code',
-              'INVALID_AMOUNT',
-            ),
-          ),
+          (failureResult.error as ValidationException).code,
+          'INVALID_AMOUNT',
         );
       });
 
@@ -423,21 +454,18 @@ void main() {
           () => mockFinanceRepo.getTransaction(1),
         ).thenAnswer((_) async => Result.success(existing));
 
-        // Act & Assert
+        // Act
+        final result = await financeTools
+            .firstWhere((t) => t.name == 'update_transaction')
+            .execute({'transaction_id': 1, 'transaction_time': 'invalid-date'});
+
+        // Assert
+        expect(result, isA<Failure<String>>());
+        final failureResult = result as Failure<String>;
+        expect(failureResult.error, isA<ValidationException>());
         expect(
-          () async => await financeTools
-              .firstWhere((t) => t.name == 'update_transaction')
-              .execute({
-                'transaction_id': 1,
-                'transaction_time': 'invalid-date',
-              }),
-          throwsA(
-            isA<ValidationException>().having(
-              (e) => e.code,
-              'code',
-              'INVALID_DATE_FORMAT',
-            ),
-          ),
+          (failureResult.error as ValidationException).code,
+          'INVALID_DATE_FORMAT',
         );
       });
     });
@@ -458,10 +486,12 @@ void main() {
             .execute({'period': 'all'});
 
         // Assert
-        expect(result, contains('Financial Summary'));
-        expect(result, contains('Income: +\$500.00'));
-        expect(result, contains('Expenses: -\$200.00'));
-        expect(result, contains('Net Balance: \$300.00'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Financial Summary'));
+        expect(successResult.value, contains('Income: +\$500.00'));
+        expect(successResult.value, contains('Expenses: -\$200.00'));
+        expect(successResult.value, contains('Net Balance: \$300.00'));
       });
 
       test('returns summary for today', () async {
@@ -487,7 +517,9 @@ void main() {
             .execute({'period': 'today'});
 
         // Assert
-        expect(result, contains('Financial Summary (today)'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Financial Summary (today)'));
       });
 
       test('returns summary for week', () async {
@@ -513,7 +545,9 @@ void main() {
             .execute({'period': 'week'});
 
         // Assert
-        expect(result, contains('Financial Summary (week)'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Financial Summary (week)'));
       });
 
       test('returns summary for month', () async {
@@ -539,7 +573,9 @@ void main() {
             .execute({'period': 'month'});
 
         // Assert
-        expect(result, contains('Financial Summary (month)'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Financial Summary (month)'));
       });
 
       test('returns summary for year', () async {
@@ -565,7 +601,9 @@ void main() {
             .execute({'period': 'year'});
 
         // Assert
-        expect(result, contains('Financial Summary (year)'));
+        expect(result, isA<Success<String>>());
+        final successResult = result as Success<String>;
+        expect(successResult.value, contains('Financial Summary (year)'));
       });
     });
   });
