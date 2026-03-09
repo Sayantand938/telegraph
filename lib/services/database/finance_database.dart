@@ -1,100 +1,28 @@
 import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
-import 'dart:io';
-import 'dart:developer' as developer;
 import 'package:telegraph/models/finance_transaction.dart';
+import 'base_database.dart';
 
-class FinanceDatabase {
+class FinanceDatabase extends BaseDatabase<FinanceTransaction> {
   static final FinanceDatabase _instance = FinanceDatabase._internal();
   factory FinanceDatabase() => _instance;
-  FinanceDatabase._internal();
+  FinanceDatabase._internal()
+    : super('telegraph_finance.db', 'FinanceDatabase');
 
-  static Database? _database;
-  bool _initializationAttempted = false;
+  @override
+  String get tableName => 'finance_transactions';
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    if (_initializationAttempted) {
-      throw Exception('Finance database initialization previously failed');
-    }
-    _initializationAttempted = true;
-    _database = await _initDatabase();
-    return _database!;
+  @override
+  Map<String, dynamic> toMap(FinanceTransaction model) {
+    return model.toMap();
   }
 
-  Future<void> reinitialize() async {
-    _database = null;
-    _initializationAttempted = false;
-    await database;
+  @override
+  FinanceTransaction fromMap(Map<String, dynamic> map) {
+    return FinanceTransaction.fromMap(map);
   }
 
-  Future<Database> _initDatabase() async {
-    try {
-      final dbPath = await getDatabasesPath();
-      final path = join(dbPath, 'telegraph_finance.db');
-
-      developer.log(
-        'Attempting to create finance database at: $path',
-        name: 'FinanceDatabase',
-      );
-
-      final directory = Directory(dirname(path));
-      if (!await directory.exists()) {
-        developer.log(
-          'Creating directory: ${directory.path}',
-          name: 'FinanceDatabase',
-        );
-        await directory.create(recursive: true);
-      }
-
-      final db = await openDatabase(path, version: 1, onCreate: _onCreate);
-      developer.log(
-        'Finance database initialized successfully at: $path',
-        name: 'FinanceDatabase',
-      );
-      return db;
-    } catch (e, stackTrace) {
-      developer.log(
-        'Error initializing finance database at primary location: $e',
-        name: 'FinanceDatabase',
-        error: e,
-        stackTrace: stackTrace,
-      );
-
-      try {
-        final fallbackPath = join(
-          Directory.current.path,
-          'telegraph_finance.db',
-        );
-        final absolutePath = File(fallbackPath).absolute.path;
-        developer.log(
-          'Attempting fallback finance database at: $absolutePath',
-          name: 'FinanceDatabase',
-        );
-
-        final db = await openDatabase(
-          absolutePath,
-          version: 1,
-          onCreate: _onCreate,
-        );
-        developer.log(
-          'Fallback finance database initialized successfully at: $absolutePath',
-          name: 'FinanceDatabase',
-        );
-        return db;
-      } catch (fallbackError, fallbackStack) {
-        developer.log(
-          'Fallback also failed: $fallbackError',
-          name: 'FinanceDatabase',
-          error: fallbackError,
-          stackTrace: fallbackStack,
-        );
-        rethrow;
-      }
-    }
-  }
-
-  Future _onCreate(Database db, int version) async {
+  @override
+  Future<void> onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE finance_transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -106,71 +34,32 @@ class FinanceDatabase {
     ''');
   }
 
-  Future<int> createTransaction(FinanceTransaction transaction) async {
-    final db = await database;
-    return await db.insert('finance_transactions', transaction.toMap());
-  }
-
-  Future<FinanceTransaction?> getTransaction(int id) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'finance_transactions',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-
-    if (maps.isNotEmpty) {
-      return FinanceTransaction.fromMap(maps.first);
-    }
-    return null;
-  }
-
-  Future<List<FinanceTransaction>> getAllTransactions() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'finance_transactions',
-      orderBy: 'event_timestamp DESC',
-    );
-
-    return List.generate(
-      maps.length,
-      (i) => FinanceTransaction.fromMap(maps[i]),
-    );
-  }
+  // Wrapper methods for backward compatibility
+  Future<int> createTransaction(FinanceTransaction transaction) async =>
+      create(transaction);
+  Future<FinanceTransaction?> getTransaction(int id) async => get(id);
+  Future<List<FinanceTransaction>> getAllTransactions() async => getAll();
+  Future<int> updateTransaction(FinanceTransaction transaction) async =>
+      update(transaction);
+  Future<int> deleteTransaction(int id) async => delete(id);
 
   Future<List<FinanceTransaction>> getTransactionsByType(
     TransactionType type,
   ) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'finance_transactions',
-      where: 'type = ?',
-      whereArgs: [type.name],
-      orderBy: 'event_timestamp DESC',
-    );
-
-    return List.generate(
-      maps.length,
-      (i) => FinanceTransaction.fromMap(maps[i]),
-    );
+    final all = await getAll();
+    return all.where((tx) => tx.type == type).toList();
   }
 
   Future<List<FinanceTransaction>> getTransactionsByDateRange(
     DateTime start,
     DateTime end,
   ) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'finance_transactions',
-      where: 'event_timestamp >= ? AND event_timestamp <= ?',
-      whereArgs: [start.toIso8601String(), end.toIso8601String()],
-      orderBy: 'event_timestamp DESC',
-    );
-
-    return List.generate(
-      maps.length,
-      (i) => FinanceTransaction.fromMap(maps[i]),
-    );
+    final all = await getAll();
+    return all.where((tx) {
+      final ts = DateTime.parse(tx.eventTimestamp);
+      return ts.isAfter(start.subtract(const Duration(seconds: 1))) &&
+          ts.isBefore(end.add(const Duration(seconds: 1)));
+    }).toList();
   }
 
   Future<double> getTotalByType(
@@ -178,45 +67,11 @@ class FinanceDatabase {
     DateTime? start,
     DateTime? end,
   }) async {
-    final db = await database;
-    String whereClause = 'type = ?';
-    List<dynamic> whereArgs = [type.name];
+    final transactions = start != null && end != null
+        ? await getTransactionsByDateRange(start, end)
+        : await getAll();
 
-    if (start != null && end != null) {
-      whereClause += ' AND event_timestamp >= ? AND event_timestamp <= ?';
-      whereArgs.addAll([start.toIso8601String(), end.toIso8601String()]);
-    }
-
-    final result = await db.rawQuery(
-      'SELECT SUM(amount) as total FROM finance_transactions WHERE $whereClause',
-      whereArgs,
-    );
-
-    final total = result.first['total'];
-    return (total as num?)?.toDouble() ?? 0.0;
-  }
-
-  Future<int> updateTransaction(FinanceTransaction transaction) async {
-    final db = await database;
-    return await db.update(
-      'finance_transactions',
-      transaction.toMap(),
-      where: 'id = ?',
-      whereArgs: [transaction.id],
-    );
-  }
-
-  Future<int> deleteTransaction(int id) async {
-    final db = await database;
-    return await db.delete(
-      'finance_transactions',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  Future<void> close() async {
-    final db = await database;
-    await db.close();
+    final filtered = transactions.where((tx) => tx.type == type);
+    return filtered.fold<double>(0.0, (sum, tx) => sum + tx.amount);
   }
 }
