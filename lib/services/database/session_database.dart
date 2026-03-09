@@ -15,12 +15,12 @@ class SessionDatabase extends BaseDatabase<Session>
 
   @override
   Map<String, dynamic> toMap(Session model) {
-    return model.toMap();
+    return model.toJson();
   }
 
   @override
   Session fromMap(Map<String, dynamic> map) {
-    return Session.fromMap(map);
+    return Session.fromJson(map);
   }
 
   @override

@@ -1,19 +1,19 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'chat_entry.freezed.dart';
+part 'chat_entry.g.dart';
+
 enum ChatEntryType { user, ai, error, system, blank }
 
-class ChatEntry {
-  final String text;
-  final String? reasoning;
-  final ChatEntryType type;
-  bool isReasoningExpanded;
+@freezed
+abstract class ChatEntry with _$ChatEntry {
+  const factory ChatEntry({
+    required String text,
+    required ChatEntryType type,
+    String? reasoning,
+    @Default(false) bool isReasoningExpanded,
+  }) = _ChatEntry;
 
-  ChatEntry({
-    required this.text,
-    this.reasoning,
-    required this.type,
-    this.isReasoningExpanded = false,
-  });
-
-  void toggleReasoning() {
-    isReasoningExpanded = !isReasoningExpanded;
-  }
+  factory ChatEntry.fromJson(Map<String, dynamic> json) =>
+      _$ChatEntryFromJson(json);
 }

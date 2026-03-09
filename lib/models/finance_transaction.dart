@@ -1,75 +1,39 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+part 'finance_transaction.freezed.dart';
+part 'finance_transaction.g.dart';
+
 enum TransactionType { income, expense }
 
-class FinanceTransaction {
-  final int? id;
-  final TransactionType type;
-  final double amount;
-  final String transactionTime;
-  final String? note;
+class TransactionTypeConverter
+    implements JsonConverter<TransactionType, String> {
+  const TransactionTypeConverter();
 
-  FinanceTransaction({
-    this.id,
-    required this.type,
-    required this.amount,
-    required this.transactionTime,
-    this.note,
-  });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'type': type.name,
-      'amount': amount,
-      'transaction_time': transactionTime,
-      'note': note,
-    };
+  @override
+  TransactionType fromJson(String json) {
+    try {
+      return TransactionType.values.firstWhere(
+        (e) => e.name == json.toLowerCase(),
+      );
+    } catch (e) {
+      return TransactionType.income; // Default to income for unknown values
+    }
   }
 
-  factory FinanceTransaction.fromMap(Map<String, dynamic> map) {
-    return FinanceTransaction(
-      id: map['id'],
-      type: TransactionType.values.firstWhere(
-        (e) => e.name == map['type'],
-        orElse: () => TransactionType.income,
-      ),
-      amount: map['amount'].toDouble(),
-      transactionTime: map['transaction_time'],
-      note: map['note'],
-    );
-  }
+  @override
+  String toJson(TransactionType object) => object.name;
+}
 
-  FinanceTransaction copyWith({
+@freezed
+abstract class FinanceTransaction with _$FinanceTransaction {
+  const factory FinanceTransaction({
     int? id,
-    TransactionType? type,
-    double? amount,
-    String? transactionTime,
+    @TransactionTypeConverter() required TransactionType type,
+    required double amount,
+    @JsonKey(name: 'transaction_time') required String transactionTime,
     String? note,
-  }) {
-    return FinanceTransaction(
-      id: id ?? this.id,
-      type: type ?? this.type,
-      amount: amount ?? this.amount,
-      transactionTime: transactionTime ?? this.transactionTime,
-      note: note ?? this.note,
-    );
-  }
+  }) = _FinanceTransaction;
 
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is FinanceTransaction &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          type == other.type &&
-          amount == other.amount &&
-          transactionTime == other.transactionTime &&
-          note == other.note;
-
-  @override
-  int get hashCode =>
-      id.hashCode ^
-      type.hashCode ^
-      amount.hashCode ^
-      transactionTime.hashCode ^
-      note.hashCode;
+  factory FinanceTransaction.fromJson(Map<String, dynamic> json) =>
+      _$FinanceTransactionFromJson(json);
 }

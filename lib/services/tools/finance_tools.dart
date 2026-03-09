@@ -324,10 +324,10 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           }
 
           final updated = existing.copyWith(
-            type: type,
-            amount: amount,
-            transactionTime: timestamp,
-            note: note,
+            type: type ?? existing.type,
+            amount: amount ?? existing.amount,
+            transactionTime: timestamp ?? existing.transactionTime,
+            note: note ?? existing.note,
           );
 
           final result = await db.updateTransaction(updated);

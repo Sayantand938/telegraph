@@ -28,55 +28,55 @@ void main() {
       });
     });
 
-    group('toMap', () {
-      test('converts income transaction to map correctly', () {
+    group('toJson', () {
+      test('converts income transaction to json correctly', () {
         final transaction = FinanceTransactionFixtures.incomeTransaction(
           id: 1,
           amount: 150.0,
           transactionTime: '2025-01-15T12:00:00Z',
           note: 'Freelance payment',
         );
-        final map = transaction.toMap();
+        final json = transaction.toJson();
 
-        expect(map['id'], 1);
-        expect(map['type'], 'income');
-        expect(map['amount'], 150.0);
-        expect(map['transaction_time'], '2025-01-15T12:00:00Z');
-        expect(map['note'], 'Freelance payment');
+        expect(json['id'], 1);
+        expect(json['type'], 'income');
+        expect(json['amount'], 150.0);
+        expect(json['transaction_time'], '2025-01-15T12:00:00Z');
+        expect(json['note'], 'Freelance payment');
       });
 
-      test('converts expense transaction to map correctly', () {
+      test('converts expense transaction to json correctly', () {
         final transaction = FinanceTransactionFixtures.expenseTransaction(
           id: 2,
           amount: 75.50,
         );
-        final map = transaction.toMap();
+        final json = transaction.toJson();
 
-        expect(map['id'], 2);
-        expect(map['type'], 'expense');
-        expect(map['amount'], 75.50);
+        expect(json['id'], 2);
+        expect(json['type'], 'expense');
+        expect(json['amount'], 75.50);
       });
 
       test('handles null note', () {
         final transaction = FinanceTransactionFixtures.incomeTransaction(
           note: null,
         );
-        final map = transaction.toMap();
+        final json = transaction.toJson();
 
-        expect(map['note'], isNull);
+        expect(json['note'], isNull);
       });
     });
 
-    group('fromMap', () {
-      test('creates income transaction from map correctly', () {
-        final map = FinanceTransactionFixtures.toMapFixture(
+    group('fromJson', () {
+      test('creates income transaction from json correctly', () {
+        final json = FinanceTransactionFixtures.toMapFixture(
           id: 1,
           type: TransactionType.income,
           amount: 200.0,
           transactionTime: '2025-01-15T14:30:00Z',
           note: 'Bonus',
         );
-        final transaction = FinanceTransaction.fromMap(map);
+        final transaction = FinanceTransaction.fromJson(json);
 
         expect(transaction.id, 1);
         expect(transaction.type, TransactionType.income);
@@ -85,14 +85,14 @@ void main() {
         expect(transaction.note, 'Bonus');
       });
 
-      test('creates expense transaction from map correctly', () {
-        final map = FinanceTransactionFixtures.toMapFixture(
+      test('creates expense transaction from json correctly', () {
+        final json = FinanceTransactionFixtures.toMapFixture(
           id: 2,
           type: TransactionType.expense,
           amount: 99.99,
           transactionTime: '2025-01-15T10:00:00Z',
         );
-        final transaction = FinanceTransaction.fromMap(map);
+        final transaction = FinanceTransaction.fromJson(json);
 
         expect(transaction.id, 2);
         expect(transaction.type, TransactionType.expense);
@@ -100,23 +100,23 @@ void main() {
       });
 
       test('defaults to income when type not found', () {
-        final map = {
+        final json = {
           'id': 1,
           'type': 'unknown',
           'amount': 100.0,
           'transaction_time': '2025-01-15T12:00:00Z',
         };
-        final transaction = FinanceTransaction.fromMap(map);
+        final transaction = FinanceTransaction.fromJson(json);
 
         expect(transaction.type, TransactionType.income);
       });
 
       test('handles null note', () {
-        final map = FinanceTransactionFixtures.toMapFixture(
+        final json = FinanceTransactionFixtures.toMapFixture(
           type: TransactionType.income,
           note: null,
         );
-        final transaction = FinanceTransaction.fromMap(map);
+        final transaction = FinanceTransaction.fromJson(json);
 
         expect(transaction.note, isNull);
       });
@@ -170,19 +170,19 @@ void main() {
         expect(TransactionType.expense.name, 'expense');
       });
 
-      test('fromMap correctly parses income from string', () {
-        final map = FinanceTransactionFixtures.toMapFixture(
+      test('fromJson correctly parses income from string', () {
+        final json = FinanceTransactionFixtures.toMapFixture(
           type: TransactionType.income,
         );
-        final transaction = FinanceTransaction.fromMap(map);
+        final transaction = FinanceTransaction.fromJson(json);
         expect(transaction.type, TransactionType.income);
       });
 
-      test('fromMap correctly parses expense from string', () {
-        final map = FinanceTransactionFixtures.toMapFixture(
+      test('fromJson correctly parses expense from string', () {
+        final json = FinanceTransactionFixtures.toMapFixture(
           type: TransactionType.expense,
         );
-        final transaction = FinanceTransaction.fromMap(map);
+        final transaction = FinanceTransaction.fromJson(json);
         expect(transaction.type, TransactionType.expense);
       });
     });

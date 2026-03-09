@@ -21,53 +21,53 @@ void main() {
       });
     });
 
-    group('toMap', () {
-      test('converts session to map correctly', () {
+    group('toJson', () {
+      test('converts session to json correctly', () {
         final session = SessionFixtures.validSession(
           id: 1,
           startTime: '2025-01-15T10:30:00Z',
           endTime: '2025-01-15T17:30:00Z',
           notes: 'Test notes',
         );
-        final map = session.toMap();
+        final json = session.toJson();
 
-        expect(map['id'], 1);
-        expect(map['start_time'], '2025-01-15T10:30:00Z');
-        expect(map['end_time'], '2025-01-15T17:30:00Z');
-        expect(map['notes'], 'Test notes');
+        expect(json['id'], 1);
+        expect(json['start_time'], '2025-01-15T10:30:00Z');
+        expect(json['end_time'], '2025-01-15T17:30:00Z');
+        expect(json['notes'], 'Test notes');
       });
 
       test('handles null id', () {
         final session = SessionFixtures.activeSession();
-        final map = session.toMap();
+        final json = session.toJson();
 
-        expect(map['id'], isNull);
+        expect(json['id'], isNull);
       });
 
       test('handles null endTime', () {
         final session = SessionFixtures.activeSession();
-        final map = session.toMap();
+        final json = session.toJson();
 
-        expect(map['end_time'], isNull);
+        expect(json['end_time'], isNull);
       });
 
       test('handles null notes', () {
         final session = SessionFixtures.validSession(notes: null);
-        final map = session.toMap();
+        final json = session.toJson();
 
-        expect(map['notes'], isNull);
+        expect(json['notes'], isNull);
       });
     });
 
-    group('fromMap', () {
-      test('creates session from map correctly', () {
-        final map = SessionFixtures.toMapFixture(
+    group('fromJson', () {
+      test('creates session from json correctly', () {
+        final json = SessionFixtures.toMapFixture(
           id: 1,
           startTime: '2025-01-15T10:30:00Z',
           endTime: '2025-01-15T17:30:00Z',
           notes: 'Test notes',
         );
-        final session = Session.fromMap(map);
+        final session = Session.fromJson(json);
 
         expect(session.id, 1);
         expect(session.startTime, '2025-01-15T10:30:00Z');
@@ -76,22 +76,22 @@ void main() {
       });
 
       test('handles null endTime', () {
-        final map = SessionFixtures.toMapFixture(
+        final json = SessionFixtures.toMapFixture(
           startTime: '2025-01-15T10:30:00Z',
           endTime: null,
           notes: 'Active session',
         );
-        final session = Session.fromMap(map);
+        final session = Session.fromJson(json);
 
         expect(session.endTime, isNull);
       });
 
       test('handles null notes', () {
-        final map = SessionFixtures.toMapFixture(
+        final json = SessionFixtures.toMapFixture(
           startTime: '2025-01-15T10:30:00Z',
           notes: null,
         );
-        final session = Session.fromMap(map);
+        final session = Session.fromJson(json);
 
         expect(session.notes, isNull);
       });

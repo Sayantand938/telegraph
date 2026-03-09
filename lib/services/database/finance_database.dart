@@ -14,12 +14,12 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction>
 
   @override
   Map<String, dynamic> toMap(FinanceTransaction model) {
-    return model.toMap();
+    return model.toJson();
   }
 
   @override
   FinanceTransaction fromMap(Map<String, dynamic> map) {
-    return FinanceTransaction.fromMap(map);
+    return FinanceTransaction.fromJson(map);
   }
 
   @override

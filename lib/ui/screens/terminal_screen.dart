@@ -206,7 +206,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                     }
 
                     if (entry.reasoning != null) {
-                      return _buildAiResponseWithReasoning(entry);
+                      return _buildAiResponseWithReasoning(entry, index);
                     }
 
                     // Render markdown for AI responses
@@ -332,12 +332,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
     );
   }
 
-  Widget _buildAiResponseWithReasoning(ChatEntry entry) {
+  Widget _buildAiResponseWithReasoning(ChatEntry entry, int index) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Collapsible reasoning section
-        _buildCollapsibleReasoning(entry),
+        _buildCollapsibleReasoning(entry, index),
         const SizedBox(height: 8),
         // AI response content with markdown
         Container(
@@ -378,7 +378,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     );
   }
 
-  Widget _buildCollapsibleReasoning(ChatEntry entry) {
+  Widget _buildCollapsibleReasoning(ChatEntry entry, int index) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8.0),
       decoration: BoxDecoration(
@@ -392,7 +392,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
           InkWell(
             onTap: () {
               setState(() {
-                entry.toggleReasoning();
+                _history[index] = _history[index].copyWith(
+                  isReasoningExpanded: !_history[index].isReasoningExpanded,
+                );
               });
             },
             child: Padding(
