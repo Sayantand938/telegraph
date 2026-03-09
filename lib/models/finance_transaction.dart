@@ -4,14 +4,14 @@ class FinanceTransaction {
   final int? id;
   final TransactionType type;
   final double amount;
-  final String eventTimestamp;
+  final String transactionTime;
   final String? note;
 
   FinanceTransaction({
     this.id,
     required this.type,
     required this.amount,
-    required this.eventTimestamp,
+    required this.transactionTime,
     this.note,
   });
 
@@ -20,7 +20,7 @@ class FinanceTransaction {
       'id': id,
       'type': type.name,
       'amount': amount,
-      'event_timestamp': eventTimestamp,
+      'transaction_time': transactionTime,
       'note': note,
     };
   }
@@ -33,7 +33,7 @@ class FinanceTransaction {
         orElse: () => TransactionType.income,
       ),
       amount: map['amount'].toDouble(),
-      eventTimestamp: map['event_timestamp'],
+      transactionTime: map['transaction_time'],
       note: map['note'],
     );
   }
@@ -42,14 +42,14 @@ class FinanceTransaction {
     int? id,
     TransactionType? type,
     double? amount,
-    String? eventTimestamp,
+    String? transactionTime,
     String? note,
   }) {
     return FinanceTransaction(
       id: id ?? this.id,
       type: type ?? this.type,
       amount: amount ?? this.amount,
-      eventTimestamp: eventTimestamp ?? this.eventTimestamp,
+      transactionTime: transactionTime ?? this.transactionTime,
       note: note ?? this.note,
     );
   }

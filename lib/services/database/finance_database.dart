@@ -28,7 +28,7 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction> {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type TEXT NOT NULL,
         amount REAL NOT NULL,
-        event_timestamp TEXT NOT NULL,
+        transaction_time TEXT NOT NULL,
         note TEXT
       )
     ''');
@@ -56,7 +56,7 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction> {
   ) async {
     final all = await getAll();
     return all.where((tx) {
-      final ts = DateTime.parse(tx.eventTimestamp);
+      final ts = DateTime.parse(tx.transactionTime);
       return ts.isAfter(start.subtract(const Duration(seconds: 1))) &&
           ts.isBefore(end.add(const Duration(seconds: 1)));
     }).toList();

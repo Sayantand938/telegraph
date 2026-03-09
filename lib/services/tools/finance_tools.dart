@@ -22,7 +22,7 @@ List<Tool> getFinanceTools(FinanceDatabase db) {
           required: true,
         ),
         ToolParameter(
-          name: 'event_timestamp',
+          name: 'transaction_time',
           type: 'string',
           description:
               'Timestamp of transaction (ISO 8601 format, e.g., 2025-01-15T10:30:00). Defaults to now.',
@@ -39,7 +39,7 @@ List<Tool> getFinanceTools(FinanceDatabase db) {
         try {
           final typeStr = args['type'] as String;
           final amount = args['amount'] as num;
-          String? timestamp = args['event_timestamp'] as String?;
+          String? timestamp = args['transaction_time'] as String?;
           final note = args['note'] as String?;
 
           final type = typeStr.toLowerCase() == 'expense'
@@ -51,7 +51,7 @@ List<Tool> getFinanceTools(FinanceDatabase db) {
           try {
             DateTime.parse(timestamp);
           } catch (e) {
-            return 'Invalid event_timestamp format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
+            return 'Invalid transaction_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
           }
 
           if (amount <= 0) {
@@ -65,7 +65,7 @@ List<Tool> getFinanceTools(FinanceDatabase db) {
           final transaction = FinanceTransaction(
             type: type,
             amount: amount.toDouble(),
-            eventTimestamp: timestamp,
+            transactionTime: timestamp,
             note: note,
           );
 
@@ -141,7 +141,7 @@ List<Tool> getFinanceTools(FinanceDatabase db) {
                 ? 'Income'
                 : 'Expense';
             buffer.writeln(
-              '  ID ${tx.id}: [$typeLabel] \$${tx.amount.toStringAsFixed(2)} at ${tx.eventTimestamp}',
+              '  ID ${tx.id}: [$typeLabel] \$${tx.amount.toStringAsFixed(2)} at ${tx.transactionTime}',
             );
             if (tx.note != null && tx.note!.isNotEmpty) {
               buffer.writeln('    Note: ${tx.note}');
@@ -201,7 +201,7 @@ List<Tool> getFinanceTools(FinanceDatabase db) {
               ? 'Income'
               : 'Expense';
           final result =
-              'Transaction $id:\n  Type: $typeLabel\n  Amount: \$${tx.amount.toStringAsFixed(2)}\n  Time: ${tx.eventTimestamp}\n  Note: ${tx.note ?? 'None'}';
+              'Transaction $id:\n  Type: $typeLabel\n  Amount: \$${tx.amount.toStringAsFixed(2)}\n  Time: ${tx.transactionTime}\n  Note: ${tx.note ?? 'None'}';
           developer.log('Transaction found: $result');
           return result;
         } catch (e, stackTrace) {
@@ -267,7 +267,7 @@ List<Tool> getFinanceTools(FinanceDatabase db) {
           required: false,
         ),
         ToolParameter(
-          name: 'event_timestamp',
+          name: 'transaction_time',
           type: 'string',
           description: 'New timestamp (ISO 8601 format)',
           required: false,
@@ -308,13 +308,13 @@ List<Tool> getFinanceTools(FinanceDatabase db) {
           }
 
           String? timestamp;
-          if (args.containsKey('event_timestamp')) {
-            final ts = args['event_timestamp'] as String;
+          if (args.containsKey('transaction_time')) {
+            final ts = args['transaction_time'] as String;
             try {
               DateTime.parse(ts);
               timestamp = ts;
             } catch (e) {
-              return 'Invalid event_timestamp format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
+              return 'Invalid transaction_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
             }
           }
 
@@ -326,7 +326,7 @@ List<Tool> getFinanceTools(FinanceDatabase db) {
           final updated = existing.copyWith(
             type: type,
             amount: amount,
-            eventTimestamp: timestamp,
+            transactionTime: timestamp,
             note: note,
           );
 
