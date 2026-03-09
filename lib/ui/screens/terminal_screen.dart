@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get_it/get_it.dart';
 import 'package:telegraph/models/chat_entry.dart';
 import 'package:telegraph/services/ai/llm_service_new.dart';
+import 'package:telegraph/core/errors/exceptions.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});
@@ -71,9 +72,21 @@ class _TerminalScreenState extends State<TerminalScreen> {
           _isProcessing = false;
         });
       }
-    } catch (e) {
+    } on AppException catch (e) {
+      // Handle our custom exceptions with user-friendly messages
       setState(() {
-        _history.add(ChatEntry(text: 'Error: $e', type: ChatEntryType.error));
+        _history.add(
+          ChatEntry(text: _formatAppException(e), type: ChatEntryType.error),
+        );
+        _history.add(ChatEntry(text: '', type: ChatEntryType.blank));
+        _isProcessing = false;
+      });
+    } catch (e) {
+      // Handle any other unexpected errors
+      setState(() {
+        _history.add(
+          ChatEntry(text: 'Unexpected error: $e', type: ChatEntryType.error),
+        );
         _history.add(ChatEntry(text: '', type: ChatEntryType.blank));
         _isProcessing = false;
       });
@@ -469,6 +482,25 @@ class _TerminalScreenState extends State<TerminalScreen> {
         return Colors.grey;
       case ChatEntryType.blank:
         return Colors.transparent;
+    }
+  }
+
+  /// Formats an AppException into a user-friendly error message
+  String _formatAppException(AppException e) {
+    if (e is ValidationException) {
+      return 'Validation error: ${e.message}';
+    } else if (e is DatabaseException) {
+      return 'Database error: ${e.message}';
+    } else if (e is AiServiceException) {
+      return 'AI service error: ${e.message}';
+    } else if (e is ToolException) {
+      return 'Tool error (${e.toolName}): ${e.message}';
+    } else if (e is NotFoundException) {
+      return 'Not found: ${e.message}';
+    } else if (e is BusinessLogicException) {
+      return 'Cannot complete: ${e.message}';
+    } else {
+      return 'Error: ${e.message}';
     }
   }
 }

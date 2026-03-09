@@ -6,6 +6,7 @@ import 'package:telegraph/services/tools/finance_tools.dart';
 import 'package:telegraph/services/tools/tool_definitions.dart';
 import 'package:telegraph/services/database/i_finance_database.dart';
 import 'package:telegraph/models/finance_transaction.dart';
+import 'package:telegraph/core/errors/exceptions.dart';
 import '../../fixtures/sample_data.dart';
 import '../../fixtures/mocks.dart';
 
@@ -72,27 +73,39 @@ void main() {
       });
 
       test('validates amount is positive', () async {
-        // Act
-        final result = await financeTools
-            .firstWhere((t) => t.name == 'add_transaction')
-            .execute({'type': 'income', 'amount': -50.0});
-
-        // Assert
-        expect(result, contains('Amount must be a positive number'));
+        // Act & Assert
+        expect(
+          () async => await financeTools
+              .firstWhere((t) => t.name == 'add_transaction')
+              .execute({'type': 'income', 'amount': -50.0}),
+          throwsA(
+            isA<ValidationException>().having(
+              (e) => e.code,
+              'code',
+              'INVALID_AMOUNT',
+            ),
+          ),
+        );
       });
 
       test('validates transaction_time format when provided', () async {
-        // Act
-        final result = await financeTools
-            .firstWhere((t) => t.name == 'add_transaction')
-            .execute({
-              'type': 'income',
-              'amount': 100.0,
-              'transaction_time': 'invalid-date',
-            });
-
-        // Assert
-        expect(result, contains('Invalid transaction_time format'));
+        // Act & Assert
+        expect(
+          () async => await financeTools
+              .firstWhere((t) => t.name == 'add_transaction')
+              .execute({
+                'type': 'income',
+                'amount': 100.0,
+                'transaction_time': 'invalid-date',
+              }),
+          throwsA(
+            isA<ValidationException>().having(
+              (e) => e.code,
+              'code',
+              'INVALID_DATE_FORMAT',
+            ),
+          ),
+        );
       });
 
       test('uses current time when transaction_time not provided', () async {
@@ -250,20 +263,29 @@ void main() {
         expect(result, contains('Bonus'));
       });
 
-      test('returns "not found" when transaction does not exist', () async {
-        // Arrange
-        when(
-          () => mockFinanceDb.getTransaction(999),
-        ).thenAnswer((_) async => null);
+      test(
+        'throws NotFoundException when transaction does not exist',
+        () async {
+          // Arrange
+          when(
+            () => mockFinanceDb.getTransaction(999),
+          ).thenAnswer((_) async => null);
 
-        // Act
-        final result = await financeTools
-            .firstWhere((t) => t.name == 'get_transaction')
-            .execute({'transaction_id': 999});
-
-        // Assert
-        expect(result, contains('Transaction 999 not found'));
-      });
+          // Act & Assert
+          expect(
+            () async => await financeTools
+                .firstWhere((t) => t.name == 'get_transaction')
+                .execute({'transaction_id': 999}),
+            throwsA(
+              isA<NotFoundException>().having(
+                (e) => e.code,
+                'code',
+                'TRANSACTION_NOT_FOUND',
+              ),
+            ),
+          );
+        },
+      );
     });
 
     group('delete_transaction', () {
@@ -283,20 +305,26 @@ void main() {
       });
 
       test(
-        'returns "not found" message when transaction does not exist',
+        'throws NotFoundException when transaction does not exist',
         () async {
           // Arrange
           when(
             () => mockFinanceDb.deleteTransaction(999),
           ).thenAnswer((_) async => 0);
 
-          // Act
-          final result = await financeTools
-              .firstWhere((t) => t.name == 'delete_transaction')
-              .execute({'transaction_id': 999});
-
-          // Assert
-          expect(result, contains('Transaction 999 not found'));
+          // Act & Assert
+          expect(
+            () async => await financeTools
+                .firstWhere((t) => t.name == 'delete_transaction')
+                .execute({'transaction_id': 999}),
+            throwsA(
+              isA<NotFoundException>().having(
+                (e) => e.code,
+                'code',
+                'TRANSACTION_NOT_FOUND',
+              ),
+            ),
+          );
         },
       );
     });
@@ -328,19 +356,25 @@ void main() {
         expect(result, contains('Transaction 1 updated successfully'));
       });
 
-      test('returns error when transaction not found', () async {
+      test('throws NotFoundException when transaction not found', () async {
         // Arrange
         when(
           () => mockFinanceDb.getTransaction(999),
         ).thenAnswer((_) async => null);
 
-        // Act
-        final result = await financeTools
-            .firstWhere((t) => t.name == 'update_transaction')
-            .execute({'transaction_id': 999, 'amount': 100.0});
-
-        // Assert
-        expect(result, contains('Transaction 999 not found'));
+        // Act & Assert
+        expect(
+          () async => await financeTools
+              .firstWhere((t) => t.name == 'update_transaction')
+              .execute({'transaction_id': 999, 'amount': 100.0}),
+          throwsA(
+            isA<NotFoundException>().having(
+              (e) => e.code,
+              'code',
+              'TRANSACTION_NOT_FOUND',
+            ),
+          ),
+        );
       });
 
       test('validates amount is positive when provided', () async {
@@ -350,13 +384,19 @@ void main() {
           () => mockFinanceDb.getTransaction(1),
         ).thenAnswer((_) async => existing);
 
-        // Act
-        final result = await financeTools
-            .firstWhere((t) => t.name == 'update_transaction')
-            .execute({'transaction_id': 1, 'amount': -50.0});
-
-        // Assert
-        expect(result, contains('Amount must be a positive number'));
+        // Act & Assert
+        expect(
+          () async => await financeTools
+              .firstWhere((t) => t.name == 'update_transaction')
+              .execute({'transaction_id': 1, 'amount': -50.0}),
+          throwsA(
+            isA<ValidationException>().having(
+              (e) => e.code,
+              'code',
+              'INVALID_AMOUNT',
+            ),
+          ),
+        );
       });
 
       test('validates transaction_time format when provided', () async {
@@ -366,13 +406,22 @@ void main() {
           () => mockFinanceDb.getTransaction(1),
         ).thenAnswer((_) async => existing);
 
-        // Act
-        final result = await financeTools
-            .firstWhere((t) => t.name == 'update_transaction')
-            .execute({'transaction_id': 1, 'transaction_time': 'invalid-date'});
-
-        // Assert
-        expect(result, contains('Invalid transaction_time format'));
+        // Act & Assert
+        expect(
+          () async => await financeTools
+              .firstWhere((t) => t.name == 'update_transaction')
+              .execute({
+                'transaction_id': 1,
+                'transaction_time': 'invalid-date',
+              }),
+          throwsA(
+            isA<ValidationException>().having(
+              (e) => e.code,
+              'code',
+              'INVALID_DATE_FORMAT',
+            ),
+          ),
+        );
       });
     });
 

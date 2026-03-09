@@ -4,6 +4,7 @@ import 'tool_definitions.dart';
 import 'session_tools.dart';
 import 'finance_tools.dart';
 import 'package:injectable/injectable.dart';
+import 'package:telegraph/core/errors/exceptions.dart';
 
 @injectable
 class ToolService {
@@ -24,7 +25,7 @@ class ToolService {
   Future<String> executeTool(String toolName, Map<String, dynamic> args) async {
     final tool = tools.firstWhere(
       (t) => t.name == toolName,
-      orElse: () => throw Exception('Tool $toolName not found'),
+      orElse: () => throw ToolException(toolName, 'Tool $toolName not found'),
     );
     return await tool.execute(args);
   }

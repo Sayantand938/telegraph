@@ -194,7 +194,6 @@ class SessionDatabase extends BaseDatabase<Session>
 
   @override
   Future<bool> hasOverlap(String start, String? end, {int? excludeId}) async {
-    final newStart = DateTime.parse(start);
     final newEnd = end != null ? DateTime.parse(end) : null;
     final db = await database;
 

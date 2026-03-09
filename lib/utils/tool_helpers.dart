@@ -1,5 +1,5 @@
-import 'dart:developer' as developer;
 import 'package:telegraph/models/finance_transaction.dart';
+import 'package:telegraph/core/errors/exceptions.dart';
 
 /// Validates if a string is a valid ISO 8601 date format
 bool isValidIso8601(String str) {
@@ -23,15 +23,22 @@ String transactionTypeLabel(TransactionType type) {
   return type == TransactionType.income ? 'Income' : 'Expense';
 }
 
-/// Generic error handler for tool execution
-Future<String> handleToolError(
-  String context,
-  Future<String> Function() action,
-) async {
-  try {
-    return await action();
-  } catch (e, stackTrace) {
-    developer.log('Error $context: $e', stackTrace: stackTrace);
-    return 'Error $context: $e';
-  }
+/// Throws a ValidationException with the given message
+Never throwValidationError(String message, {String? code}) {
+  throw ValidationException(message, code: code);
+}
+
+/// Throws a ToolException with the given message
+Never throwToolError(
+  String toolName,
+  String message, {
+  String? code,
+  dynamic originalError,
+}) {
+  throw ToolException(
+    toolName,
+    message,
+    code: code,
+    originalError: originalError,
+  );
 }

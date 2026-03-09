@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 import 'package:telegraph/models/session.dart';
 import 'package:telegraph/services/database/i_session_database.dart';
 import 'package:telegraph/utils/tool_helpers.dart';
+import 'package:telegraph/core/errors/exceptions.dart';
 import 'tool_definitions.dart';
 
 List<Tool> getSessionTools(ISessionDatabase db) {
@@ -32,48 +33,58 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        return await handleToolError('starting session', () async {
-          final notes = args['notes'] as String?;
-          String? startTime = args['start_time'] as String?;
-          String? endTime = args['end_time'] as String?;
+        final notes = args['notes'] as String?;
+        String? startTime = args['start_time'] as String?;
+        String? endTime = args['end_time'] as String?;
 
-          startTime ??= DateTime.now().toIso8601String();
+        startTime ??= DateTime.now().toIso8601String();
 
-          if (!isValidIso8601(startTime)) {
-            return 'Invalid start_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
-          }
-          if (endTime != null && !isValidIso8601(endTime)) {
-            return 'Invalid end_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
-          }
-
-          if (endTime == null) {
-            final activeSessions = await db.getSessionsByEndTimeIsNull();
-
-            if (activeSessions.isNotEmpty) {
-              developer.log(
-                'Cannot start session: active session exists (ID: ${activeSessions.first.id})',
-              );
-              return 'Cannot start a new active session. Session ${activeSessions.first.id} is already active. Please end it first using end_session(session_id=${activeSessions.first.id}).';
-            }
-          }
-
-          final hasOverlap = await db.hasOverlap(startTime, endTime);
-          if (hasOverlap) {
-            developer.log('Cannot start session: time overlap detected');
-            return 'Cannot start session: the specified time range overlaps with an existing session. Please choose a different time range.';
-          }
-
-          developer.log(
-            'Starting session with notes: $notes, start: $startTime, end: $endTime',
+        if (!isValidIso8601(startTime)) {
+          throw ValidationException(
+            'Invalid start_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
+            code: 'INVALID_DATE_FORMAT',
           );
-          final id = await db.createSession(
-            notes: notes,
-            startTime: startTime,
-            endTime: endTime,
+        }
+        if (endTime != null && !isValidIso8601(endTime)) {
+          throw ValidationException(
+            'Invalid end_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
+            code: 'INVALID_DATE_FORMAT',
           );
-          developer.log('Session started successfully with ID: $id');
-          return 'Session started with ID: $id';
-        });
+        }
+
+        if (endTime == null) {
+          final activeSessions = await db.getSessionsByEndTimeIsNull();
+
+          if (activeSessions.isNotEmpty) {
+            developer.log(
+              'Cannot start session: active session exists (ID: ${activeSessions.first.id})',
+            );
+            throw BusinessLogicException(
+              'Cannot start a new active session. Session ${activeSessions.first.id} is already active. Please end it first using end_session(session_id=${activeSessions.first.id}).',
+              code: 'ACTIVE_SESSION_EXISTS',
+            );
+          }
+        }
+
+        final hasOverlap = await db.hasOverlap(startTime, endTime);
+        if (hasOverlap) {
+          developer.log('Cannot start session: time overlap detected');
+          throw BusinessLogicException(
+            'Cannot start session: the specified time range overlaps with an existing session. Please choose a different time range.',
+            code: 'SESSION_OVERLAP',
+          );
+        }
+
+        developer.log(
+          'Starting session with notes: $notes, start: $startTime, end: $endTime',
+        );
+        final id = await db.createSession(
+          notes: notes,
+          startTime: startTime,
+          endTime: endTime,
+        );
+        developer.log('Session started successfully with ID: $id');
+        return 'Session started with ID: $id';
       },
     ),
     Tool(
@@ -88,28 +99,29 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        return await handleToolError('ending session', () async {
-          final notes = args['notes'] as String?;
-          developer.log('Ending active session with notes: $notes');
-          final result = await db.endActiveSession(notes: notes);
+        final notes = args['notes'] as String?;
+        developer.log('Ending active session with notes: $notes');
+        final result = await db.endActiveSession(notes: notes);
 
-          if (result == null) {
-            developer.log('No active session found');
-            return 'No active session found';
-          }
-
-          if (result.splitOccurred) {
-            developer.log(
-              'Active session ended with splitting: created ${result.totalSessionsCreated} sessions. Final session ID: ${result.finalSessionId}',
-            );
-            return 'Active session ended (crossed midnight - split into ${result.totalSessionsCreated} daily sessions). Final session ID: ${result.finalSessionId}';
-          }
-
-          developer.log(
-            'Active session ${result.finalSessionId} ended successfully',
+        if (result == null) {
+          developer.log('No active session found');
+          throw NotFoundException(
+            'No active session found',
+            code: 'NO_ACTIVE_SESSION',
           );
-          return 'Active session ended successfully';
-        });
+        }
+
+        if (result.splitOccurred) {
+          developer.log(
+            'Active session ended with splitting: created ${result.totalSessionsCreated} sessions. Final session ID: ${result.finalSessionId}',
+          );
+          return 'Active session ended (crossed midnight - split into ${result.totalSessionsCreated} daily sessions). Final session ID: ${result.finalSessionId}';
+        }
+
+        developer.log(
+          'Active session ${result.finalSessionId} ended successfully',
+        );
+        return 'Active session ended successfully';
       },
     ),
     Tool(
@@ -125,36 +137,34 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        return await handleToolError('listing sessions', () async {
-          final status = args['status'] as String?;
-          developer.log('Listing sessions with status filter: $status');
-          List<Session> filtered;
-          if (status == 'active') {
-            filtered = await db.getSessionsByEndTimeIsNull();
-          } else if (status == 'completed') {
-            filtered = await db.getSessionsByEndTimeIsNotNull();
-          } else {
-            filtered = await db.getAllSessions();
-          }
+        final status = args['status'] as String?;
+        developer.log('Listing sessions with status filter: $status');
+        List<Session> filtered;
+        if (status == 'active') {
+          filtered = await db.getSessionsByEndTimeIsNull();
+        } else if (status == 'completed') {
+          filtered = await db.getSessionsByEndTimeIsNotNull();
+        } else {
+          filtered = await db.getAllSessions();
+        }
 
-          if (filtered.isEmpty) {
-            return 'No sessions found';
-          }
+        if (filtered.isEmpty) {
+          return 'No sessions found';
+        }
 
-          final buffer = StringBuffer();
-          buffer.writeln('Sessions:');
-          for (final session in filtered) {
-            buffer.writeln(
-              '  ID: ${session.id} | Start: ${session.startTime} | End: ${session.endTime ?? 'N/A'}',
-            );
-            if (session.notes != null && session.notes!.isNotEmpty) {
-              buffer.writeln('    Notes: ${session.notes}');
-            }
+        final buffer = StringBuffer();
+        buffer.writeln('Sessions:');
+        for (final session in filtered) {
+          buffer.writeln(
+            '  ID: ${session.id} | Start: ${session.startTime} | End: ${session.endTime ?? 'N/A'}',
+          );
+          if (session.notes != null && session.notes!.isNotEmpty) {
+            buffer.writeln('    Notes: ${session.notes}');
           }
-          final result = buffer.toString();
-          developer.log('Found ${filtered.length} sessions');
-          return result;
-        });
+        }
+        final result = buffer.toString();
+        developer.log('Found ${filtered.length} sessions');
+        return result;
       },
     ),
     Tool(
@@ -169,19 +179,20 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        return await handleToolError('getting session', () async {
-          final id = args['session_id'] as int;
-          developer.log('Getting session $id');
-          final session = await db.getSession(id);
-          if (session == null) {
-            developer.log('Session $id not found');
-            return 'Session $id not found';
-          }
-          final result =
-              'Session $id:\n  Start: ${session.startTime}\n  End: ${session.endTime ?? 'N/A'}\n  Notes: ${session.notes ?? 'None'}';
-          developer.log('Session found: $result');
-          return result;
-        });
+        final id = args['session_id'] as int;
+        developer.log('Getting session $id');
+        final session = await db.getSession(id);
+        if (session == null) {
+          developer.log('Session $id not found');
+          throw NotFoundException(
+            'Session $id not found',
+            code: 'SESSION_NOT_FOUND',
+          );
+        }
+        final result =
+            'Session $id:\n  Start: ${session.startTime}\n  End: ${session.endTime ?? 'N/A'}\n  Notes: ${session.notes ?? 'None'}';
+        developer.log('Session found: $result');
+        return result;
       },
     ),
     Tool(
@@ -196,17 +207,18 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        return await handleToolError('deleting session', () async {
-          final id = args['session_id'] as int;
-          developer.log('Deleting session $id');
-          final result = await db.deleteSession(id);
-          if (result > 0) {
-            developer.log('Session $id deleted successfully');
-            return 'Session $id deleted successfully';
-          }
-          developer.log('Session $id not found');
-          return 'Session $id not found';
-        });
+        final id = args['session_id'] as int;
+        developer.log('Deleting session $id');
+        final result = await db.deleteSession(id);
+        if (result > 0) {
+          developer.log('Session $id deleted successfully');
+          return 'Session $id deleted successfully';
+        }
+        developer.log('Session $id not found');
+        throw NotFoundException(
+          'Session $id not found',
+          code: 'SESSION_NOT_FOUND',
+        );
       },
     ),
     Tool(
@@ -215,20 +227,21 @@ List<Tool> getSessionTools(ISessionDatabase db) {
           'Get details of the most recent active session. Returns "No active sessions found" if none exist.',
       parameters: [],
       execute: (args) async {
-        return await handleToolError('getting active session', () async {
-          developer.log('Getting most recent active session');
-          final session = await db.getMostRecentActiveSession();
+        developer.log('Getting most recent active session');
+        final session = await db.getMostRecentActiveSession();
 
-          if (session == null) {
-            developer.log('No active sessions found');
-            return 'No active sessions found';
-          }
+        if (session == null) {
+          developer.log('No active sessions found');
+          throw NotFoundException(
+            'No active sessions found',
+            code: 'NO_ACTIVE_SESSION',
+          );
+        }
 
-          final result =
-              'Active Session ID: ${session.id}\n  Start: ${session.startTime}\n  Notes: ${session.notes ?? 'None'}';
-          developer.log('Found active session: $result');
-          return result;
-        });
+        final result =
+            'Active Session ID: ${session.id}\n  Start: ${session.startTime}\n  Notes: ${session.notes ?? 'None'}';
+        developer.log('Found active session: $result');
+        return result;
       },
     ),
     Tool(
@@ -256,36 +269,40 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        return await handleToolError('updating session notes', () async {
-          final id = args['session_id'] as int;
-          final notes = args['notes'] as String;
-          final append = args['append'] as bool? ?? true;
+        final id = args['session_id'] as int;
+        final notes = args['notes'] as String;
+        final append = args['append'] as bool? ?? true;
 
-          developer.log('Updating notes for session $id (append: $append)');
+        developer.log('Updating notes for session $id (append: $append)');
 
-          final session = await db.getSession(id);
-          if (session == null) {
-            developer.log('Session $id not found');
-            return 'Session $id not found';
-          }
+        final session = await db.getSession(id);
+        if (session == null) {
+          developer.log('Session $id not found');
+          throw NotFoundException(
+            'Session $id not found',
+            code: 'SESSION_NOT_FOUND',
+          );
+        }
 
-          String finalNotes;
-          if (append && session.notes?.isNotEmpty == true) {
-            finalNotes = '${session.notes}\n\n[Added later]: $notes';
-          } else {
-            finalNotes = notes;
-          }
+        String finalNotes;
+        if (append && session.notes?.isNotEmpty == true) {
+          finalNotes = '${session.notes}\n\n[Added later]: $notes';
+        } else {
+          finalNotes = notes;
+        }
 
-          final updatedSession = session.copyWith(notes: finalNotes);
-          final result = await db.updateSession(updatedSession);
+        final updatedSession = session.copyWith(notes: finalNotes);
+        final result = await db.updateSession(updatedSession);
 
-          if (result > 0) {
-            developer.log('Session $id notes updated successfully');
-            return 'Session $id notes updated successfully.\nCurrent notes:\n$finalNotes';
-          }
-          developer.log('Failed to update session $id');
-          return 'Failed to update session $id';
-        });
+        if (result > 0) {
+          developer.log('Session $id notes updated successfully');
+          return 'Session $id notes updated successfully.\nCurrent notes:\n$finalNotes';
+        }
+        developer.log('Failed to update session $id');
+        throw DatabaseException(
+          'Failed to update session $id',
+          code: 'DB_UPDATE_FAILED',
+        );
       },
     ),
   ];

@@ -1,6 +1,7 @@
 import 'llm_client.dart';
 import 'package:telegraph/services/tools/tool_service.dart';
 import 'dart:developer' as developer;
+import 'package:telegraph/core/errors/exceptions.dart';
 
 /// Result of a tool execution
 class ToolExecutionResult {
@@ -80,11 +81,21 @@ class ToolExecutor {
 
       developer.log('Tool ${toolCall.name} failed: $e', stackTrace: stackTrace);
 
+      // Wrap the exception in a ToolException if it's not already one
+      final exception = e is AppException
+          ? e
+          : ToolException(
+              toolCall.name,
+              'Tool execution failed',
+              originalError: e,
+              code: 'TOOL_EXECUTION_ERROR',
+            );
+
       return ToolExecutionResult(
         toolName: toolCall.name,
         result: '',
         success: false,
-        error: e.toString(),
+        error: exception.toString(),
         executionTimeMs: stopwatch.elapsedMilliseconds,
       );
     }
@@ -96,7 +107,9 @@ class ToolExecutor {
       if (result.success) {
         return LlmMessage.tool(result.result);
       } else {
-        return LlmMessage.tool('Error: ${result.error}');
+        // Convert error to user-friendly message
+        final errorMessage = result.error ?? 'Unknown error';
+        return LlmMessage.tool('Error: $errorMessage');
       }
     }).toList();
   }

@@ -1,7 +1,8 @@
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite/sqflite.dart' hide DatabaseException;
 import 'package:path/path.dart';
 import 'dart:io';
 import 'dart:developer' as developer;
+import 'package:telegraph/core/errors/exceptions.dart';
 
 abstract class BaseDatabase<T> {
   static final String _defaultLoggerName = 'BaseDatabase';
@@ -34,7 +35,7 @@ abstract class BaseDatabase<T> {
     if (_databaseInstance != null) return _databaseInstance!;
 
     if (_initializationAttempted) {
-      throw Exception('Database initialization previously failed');
+      throw DatabaseException('Database initialization previously failed');
     }
     _initializationAttempted = true;
 
@@ -107,7 +108,11 @@ abstract class BaseDatabase<T> {
           error: fallbackError,
           stackTrace: fallbackStack,
         );
-        rethrow;
+        throw DatabaseException(
+          'Failed to initialize database',
+          originalError: e,
+          code: 'DB_INIT_FAILED',
+        );
       }
     }
   }
@@ -150,7 +155,10 @@ abstract class BaseDatabase<T> {
     final map = toMap(model);
     final id = map['id'];
     if (id == null) {
-      throw ArgumentError('Model must have an id to update');
+      throw ValidationException(
+        'Model must have an id to update',
+        code: 'MISSING_ID',
+      );
     }
     return await db.update(tableName, map, where: 'id = ?', whereArgs: [id]);
   }

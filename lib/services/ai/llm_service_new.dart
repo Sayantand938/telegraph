@@ -3,6 +3,7 @@ import 'llm_client.dart';
 import 'conversation_manager.dart';
 import 'tool_executor.dart';
 import 'package:telegraph/services/tools/tool_service.dart';
+import 'package:telegraph/core/errors/exceptions.dart';
 
 /// Main service for interacting with the LLM
 /// This is a facade that coordinates the specialized components
@@ -41,7 +42,10 @@ class LlmServiceNew {
   /// Get the current model name
   String getModelName() {
     if (!_initialized) {
-      throw StateError('Service not initialized. Call initialize() first.');
+      throw AiServiceException(
+        'Service not initialized. Call initialize() first.',
+        code: 'NOT_INITIALIZED',
+      );
     }
     return _modelName!;
   }
@@ -118,7 +122,11 @@ class LlmServiceNew {
         toolCalls: toolCallsMaps,
       );
     } catch (e) {
-      return AiResponse(content: 'Error: $e');
+      throw AiServiceException(
+        'Failed to send message',
+        originalError: e,
+        code: 'LLM_REQUEST_FAILED',
+      );
     }
   }
 
@@ -177,7 +185,11 @@ class LlmServiceNew {
         toolCalls: null,
       );
     } catch (e) {
-      return AiResponse(content: 'Error after tool execution: $e');
+      throw AiServiceException(
+        'Error after tool execution',
+        originalError: e,
+        code: 'TOOL_EXECUTION_FAILED',
+      );
     }
   }
 }

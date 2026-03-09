@@ -4,6 +4,7 @@ import 'package:telegraph/services/tools/session_tools.dart';
 import 'package:telegraph/services/tools/tool_definitions.dart';
 import 'package:telegraph/services/database/i_session_database.dart';
 import 'package:telegraph/models/session.dart';
+import 'package:telegraph/core/errors/exceptions.dart';
 import '../../fixtures/sample_data.dart';
 import '../../fixtures/mocks.dart';
 
@@ -51,19 +52,33 @@ void main() {
       });
 
       test('validates start_time format', () async {
-        final result = await sessionTools
-            .firstWhere((t) => t.name == 'start_session')
-            .execute({'start_time': 'invalid-date'});
-
-        expect(result, contains('Invalid start_time format'));
+        expect(
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'start_session')
+              .execute({'start_time': 'invalid-date'}),
+          throwsA(
+            isA<ValidationException>().having(
+              (e) => e.code,
+              'code',
+              'INVALID_DATE_FORMAT',
+            ),
+          ),
+        );
       });
 
       test('validates end_time format when provided', () async {
-        final result = await sessionTools
-            .firstWhere((t) => t.name == 'start_session')
-            .execute({'end_time': 'invalid-date'});
-
-        expect(result, contains('Invalid end_time format'));
+        expect(
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'start_session')
+              .execute({'end_time': 'invalid-date'}),
+          throwsA(
+            isA<ValidationException>().having(
+              (e) => e.code,
+              'code',
+              'INVALID_DATE_FORMAT',
+            ),
+          ),
+        );
       });
 
       test('prevents starting session when active session exists', () async {
@@ -72,13 +87,19 @@ void main() {
           () => mockSessionDb.getSessionsByEndTimeIsNull(),
         ).thenAnswer((_) async => [SessionFixtures.activeSession()]);
 
-        // Act
-        final result = await sessionTools
-            .firstWhere((t) => t.name == 'start_session')
-            .execute({});
-
-        // Assert
-        expect(result, contains('Cannot start a new active session'));
+        // Act & Assert
+        expect(
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'start_session')
+              .execute({}),
+          throwsA(
+            isA<BusinessLogicException>().having(
+              (e) => e.code,
+              'code',
+              'ACTIVE_SESSION_EXISTS',
+            ),
+          ),
+        );
       });
 
       test('prevents starting session when time overlap detected', () async {
@@ -90,15 +111,18 @@ void main() {
           () => mockSessionDb.hasOverlap(any(), any()),
         ).thenAnswer((_) async => true);
 
-        // Act
-        final result = await sessionTools
-            .firstWhere((t) => t.name == 'start_session')
-            .execute({});
-
-        // Assert
+        // Act & Assert
         expect(
-          result,
-          contains('Cannot start session: the specified time range overlaps'),
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'start_session')
+              .execute({}),
+          throwsA(
+            isA<BusinessLogicException>().having(
+              (e) => e.code,
+              'code',
+              'SESSION_OVERLAP',
+            ),
+          ),
         );
       });
     });
@@ -130,7 +154,7 @@ void main() {
         expect(result, contains('Active session ended successfully'));
       });
 
-      test('returns message when no active session found', () async {
+      test('throws NotFoundException when no active session found', () async {
         // Arrange
         when(
           () => mockSessionDb.getSessionsByEndTimeIsNull(),
@@ -139,13 +163,19 @@ void main() {
           () => mockSessionDb.endActiveSession(notes: any(named: 'notes')),
         ).thenAnswer((_) async => null);
 
-        // Act
-        final result = await sessionTools
-            .firstWhere((t) => t.name == 'end_session')
-            .execute({});
-
-        // Assert
-        expect(result, contains('No active session found'));
+        // Act & Assert
+        expect(
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'end_session')
+              .execute({}),
+          throwsA(
+            isA<NotFoundException>().having(
+              (e) => e.code,
+              'code',
+              'NO_ACTIVE_SESSION',
+            ),
+          ),
+        );
       });
 
       test('handles session splitting across midnight', () async {
@@ -280,17 +310,23 @@ void main() {
         expect(result, contains('End:'));
       });
 
-      test('returns "not found" message when session does not exist', () async {
+      test('throws NotFoundException when session does not exist', () async {
         // Arrange
         when(() => mockSessionDb.getSession(999)).thenAnswer((_) async => null);
 
-        // Act
-        final result = await sessionTools
-            .firstWhere((t) => t.name == 'get_session')
-            .execute({'session_id': 999});
-
-        // Assert
-        expect(result, contains('Session 999 not found'));
+        // Act & Assert
+        expect(
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'get_session')
+              .execute({'session_id': 999}),
+          throwsA(
+            isA<NotFoundException>().having(
+              (e) => e.code,
+              'code',
+              'SESSION_NOT_FOUND',
+            ),
+          ),
+        );
       });
     });
 
@@ -308,17 +344,23 @@ void main() {
         expect(result, contains('Session 1 deleted successfully'));
       });
 
-      test('returns "not found" message when session does not exist', () async {
+      test('throws NotFoundException when session does not exist', () async {
         // Arrange
         when(() => mockSessionDb.deleteSession(999)).thenAnswer((_) async => 0);
 
-        // Act
-        final result = await sessionTools
-            .firstWhere((t) => t.name == 'delete_session')
-            .execute({'session_id': 999});
-
-        // Assert
-        expect(result, contains('Session 999 not found'));
+        // Act & Assert
+        expect(
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'delete_session')
+              .execute({'session_id': 999}),
+          throwsA(
+            isA<NotFoundException>().having(
+              (e) => e.code,
+              'code',
+              'SESSION_NOT_FOUND',
+            ),
+          ),
+        );
       });
     });
 
@@ -348,19 +390,25 @@ void main() {
         expect(result, contains('Active Session ID: 2'));
       });
 
-      test('returns "No active sessions found" when none exist', () async {
+      test('throws NotFoundException when no active session exists', () async {
         // Arrange
         when(
           () => mockSessionDb.getMostRecentActiveSession(),
         ).thenAnswer((_) async => null);
 
-        // Act
-        final result = await sessionTools
-            .firstWhere((t) => t.name == 'get_active_session')
-            .execute({});
-
-        // Assert
-        expect(result, contains('No active sessions found'));
+        // Act & Assert
+        expect(
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'get_active_session')
+              .execute({}),
+          throwsA(
+            isA<NotFoundException>().having(
+              (e) => e.code,
+              'code',
+              'NO_ACTIVE_SESSION',
+            ),
+          ),
+        );
       });
     });
 
@@ -435,17 +483,23 @@ void main() {
         expect(result, isNot(contains('Original')));
       });
 
-      test('returns error when session not found', () async {
+      test('throws NotFoundException when session not found', () async {
         // Arrange
         when(() => mockSessionDb.getSession(999)).thenAnswer((_) async => null);
 
-        // Act
-        final result = await sessionTools
-            .firstWhere((t) => t.name == 'update_session_notes')
-            .execute({'session_id': 999, 'notes': 'Notes'});
-
-        // Assert
-        expect(result, contains('Session 999 not found'));
+        // Act & Assert
+        expect(
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'update_session_notes')
+              .execute({'session_id': 999, 'notes': 'Notes'}),
+          throwsA(
+            isA<NotFoundException>().having(
+              (e) => e.code,
+              'code',
+              'SESSION_NOT_FOUND',
+            ),
+          ),
+        );
       });
     });
   });

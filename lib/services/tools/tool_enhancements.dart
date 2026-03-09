@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'tool_definitions.dart';
 import 'tool_service.dart';
+import 'package:telegraph/core/errors/exceptions.dart';
 
 /// Custom validation function type
 typedef ValidationRule<T> = String? Function(T value);
@@ -357,7 +358,7 @@ class EnhancedToolExecutor {
       // Get tool definition
       final tool = _toolService.tools.firstWhere(
         (t) => t.name == toolName,
-        orElse: () => throw Exception('Tool $toolName not found'),
+        orElse: () => throw ToolException(toolName, 'Tool $toolName not found'),
       );
 
       // Validate parameters
