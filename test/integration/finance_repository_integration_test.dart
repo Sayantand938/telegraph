@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_non_null_assertion
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telegraph/models/finance_transaction.dart';
 import 'package:telegraph/services/repositories/i_finance_repository.dart';

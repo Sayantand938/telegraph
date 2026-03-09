@@ -28,7 +28,7 @@ abstract class BaseDatabase<T> {
   Future<Database> get database async {
     // If we have an injected database, use it directly
     if (_injectedDatabase != null) {
-      return _injectedDatabase!;
+      return _injectedDatabase;
     }
 
     if (_databaseInstance != null) return _databaseInstance!;
