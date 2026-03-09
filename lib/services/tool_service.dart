@@ -235,6 +235,41 @@ class ToolService {
         }
       },
     ),
+    Tool(
+      name: 'get_active_session',
+      description:
+          'Get details of the most recent active session. Returns "No active sessions found" if none exist.',
+      parameters: [],
+      execute: (args) async {
+        try {
+          developer.log('Getting most recent active session');
+          final allSessions = await _db.getAllSessions();
+          final activeSessions = allSessions
+              .where((s) => s.endTime == null)
+              .toList();
+
+          if (activeSessions.isEmpty) {
+            developer.log('No active sessions found');
+            return 'No active sessions found';
+          }
+
+          // Sort by start time descending (most recent first)
+          activeSessions.sort((a, b) => b.startTime.compareTo(a.startTime));
+          final session = activeSessions.first;
+
+          final result =
+              'Active Session ID: ${session.id}\n  Start: ${session.startTime}\n  Notes: ${session.notes ?? 'None'}';
+          developer.log('Found active session: $result');
+          return result;
+        } catch (e, stackTrace) {
+          developer.log(
+            'Error getting active session: $e',
+            stackTrace: stackTrace,
+          );
+          return 'Error getting active session: $e';
+        }
+      },
+    ),
   ];
 
   List<Map<String, dynamic>> getToolSchemas() {
