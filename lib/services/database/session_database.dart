@@ -107,13 +107,17 @@ class SessionDatabase {
     ''');
   }
 
-  Future<int> createSession({String? notes}) async {
+  Future<int> createSession({
+    String? notes,
+    String? startTime,
+    String? endTime,
+  }) async {
     final db = await database;
     final now = DateTime.now().toIso8601String();
 
     return await db.insert('sessions', {
-      'start_time': now,
-      'end_time': null,
+      'start_time': startTime ?? now,
+      'end_time': endTime,
       'notes': notes,
     });
   }
@@ -157,10 +161,11 @@ class SessionDatabase {
     if (session == null) return 0;
 
     final now = DateTime.now().toIso8601String();
-    final updatedSession = session.copyWith(
-      endTime: now,
-      notes: notes ?? session.notes,
-    );
+    // Only update notes if the session doesn't already have notes
+    final updatedNotes = session.notes?.isNotEmpty == true
+        ? session.notes
+        : notes;
+    final updatedSession = session.copyWith(endTime: now, notes: updatedNotes);
 
     return await updateSession(updatedSession);
   }
@@ -173,5 +178,66 @@ class SessionDatabase {
   Future<void> close() async {
     final db = await database;
     await db.close();
+  }
+
+  /// Checks if the given time range overlaps with any existing session.
+  /// [start] is the start time of the new session (ISO 8601 string).
+  /// [end] is the end time (null for active sessions that extend indefinitely).
+  /// [excludeId] optionally excludes a session from the check (useful for updates).
+  /// Returns true if overlap exists, false otherwise.
+  Future<bool> hasOverlap(String start, String? end, {int? excludeId}) async {
+    final db = await database;
+    final allSessions = await db.query('sessions');
+
+    final newStart = DateTime.parse(start);
+    final newEnd = end != null ? DateTime.parse(end) : null;
+
+    for (final map in allSessions) {
+      final session = Session.fromMap(map);
+
+      // Skip the excluded session (for updates)
+      if (excludeId != null && session.id == excludeId) {
+        continue;
+      }
+
+      final existingStart = DateTime.parse(session.startTime);
+      final existingEnd = session.endTime != null
+          ? DateTime.parse(session.endTime!)
+          : null;
+
+      // Check for overlap: two ranges [start1, end1] and [start2, end2] overlap if:
+      // start1 < end2 && start2 < end1
+      // For active sessions (end = null), treat as extending to infinity
+
+      bool overlap = false;
+
+      if (existingEnd == null) {
+        // Existing session is active - extends to infinity
+        // Overlap exists if new session starts after existing session started
+        overlap =
+            newStart.isAfter(existingStart) ||
+            newStart.isAtSameMomentAs(existingStart);
+      } else if (newEnd == null) {
+        // New session is active - extends to infinity
+        // Overlap exists if existing session starts after new session started
+        overlap =
+            existingStart.isAfter(newStart) ||
+            existingStart.isAtSameMomentAs(newStart);
+      } else {
+        // Both have defined end times
+        overlap =
+            newStart.isBefore(existingEnd) && existingStart.isBefore(newEnd);
+      }
+
+      if (overlap) {
+        developer.log(
+          'Overlap detected: new [$start, $end] overlaps with existing session ${session.id} [${session.startTime}, ${session.endTime}]',
+          name: 'SessionDatabase',
+        );
+        return true;
+      }
+    }
+
+    return false;
   }
 }

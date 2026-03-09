@@ -73,7 +73,7 @@ class ToolService {
   List<Tool> get tools => [
     Tool(
       name: 'start_session',
-      description: 'Start a new session with an optional note',
+      description: 'Start a new session with optional note and custom times',
       parameters: [
         ToolParameter(
           name: 'notes',
@@ -81,12 +81,78 @@ class ToolService {
           description: 'Optional notes for this session',
           required: false,
         ),
+        ToolParameter(
+          name: 'start_time',
+          type: 'string',
+          description:
+              'Optional start time (ISO 8601 format, e.g., 2025-01-15T10:30:00). Defaults to now.',
+          required: false,
+        ),
+        ToolParameter(
+          name: 'end_time',
+          type: 'string',
+          description:
+              'Optional end time (ISO 8601 format). Omit for active sessions.',
+          required: false,
+        ),
       ],
       execute: (args) async {
         try {
           final notes = args['notes'] as String?;
-          developer.log('Starting session with notes: $notes');
-          final id = await _db.createSession(notes: notes);
+          String? startTime = args['start_time'] as String?;
+          String? endTime = args['end_time'] as String?;
+
+          // Default start time to now if not provided
+          if (startTime == null) {
+            startTime = DateTime.now().toIso8601String();
+          }
+
+          // Validate time format if provided
+          if (startTime != null) {
+            try {
+              DateTime.parse(startTime);
+            } catch (e) {
+              return 'Invalid start_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
+            }
+          }
+          if (endTime != null) {
+            try {
+              DateTime.parse(endTime);
+            } catch (e) {
+              return 'Invalid end_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
+            }
+          }
+
+          // Check for active sessions (if new session is active or starts in future)
+          if (endTime == null) {
+            final allSessions = await _db.getAllSessions();
+            final activeSessions = allSessions
+                .where((s) => s.endTime == null)
+                .toList();
+
+            if (activeSessions.isNotEmpty) {
+              developer.log(
+                'Cannot start session: active session exists (ID: ${activeSessions.first.id})',
+              );
+              return 'Cannot start a new active session. Session ${activeSessions.first.id} is already active. Please end it first using end_session(session_id=${activeSessions.first.id}).';
+            }
+          }
+
+          // Check for time overlap with any existing session
+          final hasOverlap = await _db.hasOverlap(startTime, endTime);
+          if (hasOverlap) {
+            developer.log('Cannot start session: time overlap detected');
+            return 'Cannot start session: the specified time range overlaps with an existing session. Please choose a different time range.';
+          }
+
+          developer.log(
+            'Starting session with notes: $notes, start: $startTime, end: $endTime',
+          );
+          final id = await _db.createSession(
+            notes: notes,
+            startTime: startTime,
+            endTime: endTime,
+          );
           developer.log('Session started successfully with ID: $id');
           return 'Session started with ID: $id';
         } catch (e, stackTrace) {
@@ -115,6 +181,19 @@ class ToolService {
       execute: (args) async {
         try {
           final id = args['session_id'] as int;
+
+          // Check if session exists and is active
+          final session = await _db.getSession(id);
+          if (session == null) {
+            developer.log('Session $id not found');
+            return 'Session $id not found';
+          }
+
+          if (session.endTime != null) {
+            developer.log('Session $id is already ended');
+            return 'Session $id is already ended (ended at: ${session.endTime})';
+          }
+
           final notes = args['notes'] as String?;
           developer.log('Ending session $id with notes: $notes');
           final result = await _db.endSession(id, notes: notes);
@@ -268,6 +347,69 @@ class ToolService {
             stackTrace: stackTrace,
           );
           return 'Error getting active session: $e';
+        }
+      },
+    ),
+    Tool(
+      name: 'update_session_notes',
+      description: 'Add or append notes to an existing session',
+      parameters: [
+        ToolParameter(
+          name: 'session_id',
+          type: 'integer',
+          description: 'The ID of the session to update',
+          required: true,
+        ),
+        ToolParameter(
+          name: 'notes',
+          type: 'string',
+          description: 'Notes to add or append to the session',
+          required: true,
+        ),
+        ToolParameter(
+          name: 'append',
+          type: 'boolean',
+          description:
+              'If true, append notes to existing; if false, overwrite (default: true)',
+          required: false,
+        ),
+      ],
+      execute: (args) async {
+        try {
+          final id = args['session_id'] as int;
+          final notes = args['notes'] as String;
+          final append = args['append'] as bool? ?? true;
+
+          developer.log('Updating notes for session $id (append: $append)');
+
+          final session = await _db.getSession(id);
+          if (session == null) {
+            developer.log('Session $id not found');
+            return 'Session $id not found';
+          }
+
+          String finalNotes;
+          if (append && session.notes?.isNotEmpty == true) {
+            finalNotes = '${session.notes}\n\n[Added later]: $notes';
+          } else {
+            finalNotes = notes;
+          }
+
+          final updatedSession = session.copyWith(notes: finalNotes);
+          final result = await _db.updateSession(updatedSession);
+
+          if (result > 0) {
+            developer.log('Session $id notes updated successfully');
+            return 'Session $id notes updated successfully.\nCurrent notes:\n$finalNotes';
+          }
+          developer.log('Failed to update session $id');
+          return 'Failed to update session $id';
+        } catch (e, stackTrace) {
+          developer.log(
+            'Error updating session notes: $e',
+            stackTrace: stackTrace,
+          );
+          return 'Error updating session notes: $e';
         }
       },
     ),
