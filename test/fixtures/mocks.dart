@@ -1,12 +1,20 @@
 import 'package:mocktail/mocktail.dart';
 import 'package:telegraph/services/database/i_session_database.dart';
 import 'package:telegraph/services/database/i_finance_database.dart';
+import 'package:telegraph/services/repositories/i_session_repository.dart';
+import 'package:telegraph/services/repositories/i_finance_repository.dart';
 import 'package:telegraph/models/session.dart';
 import 'package:telegraph/models/finance_transaction.dart';
+import 'package:telegraph/core/errors/result.dart';
+import 'package:telegraph/core/errors/exceptions.dart';
 
 class MockSessionDatabase extends Mock implements ISessionDatabase {}
 
 class MockFinanceDatabase extends Mock implements IFinanceDatabase {}
+
+class MockSessionRepository extends Mock implements ISessionRepository {}
+
+class MockFinanceRepository extends Mock implements IFinanceRepository {}
 
 /// Helper class to create common session data for testing
 class SessionTestHelper {

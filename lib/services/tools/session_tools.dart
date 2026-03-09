@@ -1,11 +1,12 @@
 import 'dart:developer' as developer;
 import 'package:telegraph/models/session.dart';
-import 'package:telegraph/services/database/i_session_database.dart';
+import 'package:telegraph/services/repositories/i_session_repository.dart';
 import 'package:telegraph/utils/tool_helpers.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:telegraph/core/errors/result.dart';
 import 'tool_definitions.dart';
 
-List<Tool> getSessionTools(ISessionDatabase db) {
+List<Tool> getSessionTools(ISessionRepository repository) {
   return [
     Tool(
       name: 'start_session',
@@ -40,51 +41,131 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         startTime ??= DateTime.now().toIso8601String();
 
         if (!isValidIso8601(startTime)) {
-          throw ValidationException(
-            'Invalid start_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
-            code: 'INVALID_DATE_FORMAT',
+          return Result.failure(
+            ValidationException(
+              'Invalid start_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
+              code: 'INVALID_DATE_FORMAT',
+            ),
           );
         }
         if (endTime != null && !isValidIso8601(endTime)) {
-          throw ValidationException(
-            'Invalid end_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
-            code: 'INVALID_DATE_FORMAT',
+          return Result.failure(
+            ValidationException(
+              'Invalid end_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
+              code: 'INVALID_DATE_FORMAT',
+            ),
           );
         }
 
         if (endTime == null) {
-          final activeSessions = await db.getSessionsByEndTimeIsNull();
+          final activeSessionsResult = await repository
+              .getSessionsByEndTimeIsNull();
+
+          if (activeSessionsResult.isFailure) {
+            return Result.failure(
+              DatabaseException(
+                'Failed to check active sessions: ${activeSessionsResult.error.message}',
+                code: activeSessionsResult.error.code ?? 'DB_QUERY_FAILED',
+                originalError: activeSessionsResult.error.originalError,
+              ),
+            );
+          }
+
+          final activeSessions = activeSessionsResult.value;
 
           if (activeSessions.isNotEmpty) {
             developer.log(
               'Cannot start session: active session exists (ID: ${activeSessions.first.id})',
             );
-            throw BusinessLogicException(
-              'Cannot start a new active session. Session ${activeSessions.first.id} is already active. Please end it first using end_session(session_id=${activeSessions.first.id}).',
-              code: 'ACTIVE_SESSION_EXISTS',
+            return Result.failure(
+              BusinessLogicException(
+                'Cannot start a new active session. Session ${activeSessions.first.id} is already active. Please end it first using end_session(session_id=${activeSessions.first.id}).',
+                code: 'ACTIVE_SESSION_EXISTS',
+              ),
             );
           }
         }
 
-        final hasOverlap = await db.hasOverlap(startTime, endTime);
+        final hasOverlapResult = await repository.hasOverlap(
+          startTime,
+          endTime,
+        );
+
+        if (hasOverlapResult.isFailure) {
+          final error = hasOverlapResult.error;
+          if (error is BusinessLogicException) {
+            return Result.failure(
+              BusinessLogicException(
+                error.message,
+                code: error.code,
+                originalError: error.originalError,
+              ),
+            );
+          }
+          return Result.failure(
+            DatabaseException(
+              'Failed to check session overlap: ${error.message}',
+              code: error.code ?? 'DB_QUERY_FAILED',
+              originalError: error.originalError,
+            ),
+          );
+        }
+
+        final hasOverlap = hasOverlapResult.value;
+
         if (hasOverlap) {
           developer.log('Cannot start session: time overlap detected');
-          throw BusinessLogicException(
-            'Cannot start session: the specified time range overlaps with an existing session. Please choose a different time range.',
-            code: 'SESSION_OVERLAP',
+          return Result.failure(
+            BusinessLogicException(
+              'Cannot start session: the specified time range overlaps with an existing session. Please choose a different time range.',
+              code: 'SESSION_OVERLAP',
+            ),
           );
         }
 
         developer.log(
           'Starting session with notes: $notes, start: $startTime, end: $endTime',
         );
-        final id = await db.createSession(
+
+        final createResult = await repository.createSession(
           notes: notes,
           startTime: startTime,
           endTime: endTime,
         );
-        developer.log('Session started successfully with ID: $id');
-        return 'Session started with ID: $id';
+
+        return createResult.when(
+          success: (id) {
+            developer.log('Session started successfully with ID: $id');
+            return Result.success('Session started with ID: $id');
+          },
+          failure: (error) {
+            developer.log('Failed to create session: $error');
+            if (error is DatabaseException) {
+              return Result.failure(
+                DatabaseException(
+                  error.message,
+                  code: error.code,
+                  originalError: error.originalError,
+                ),
+              );
+            }
+            if (error is BusinessLogicException) {
+              return Result.failure(
+                BusinessLogicException(
+                  error.message,
+                  code: error.code,
+                  originalError: error.originalError,
+                ),
+              );
+            }
+            return Result.failure(
+              DatabaseException(
+                'Failed to create session: ${error.message}',
+                code: 'DB_CREATE_FAILED',
+              ),
+            );
+          },
+        );
       },
     ),
     Tool(
@@ -101,27 +182,63 @@ List<Tool> getSessionTools(ISessionDatabase db) {
       execute: (args) async {
         final notes = args['notes'] as String?;
         developer.log('Ending active session with notes: $notes');
-        final result = await db.endActiveSession(notes: notes);
 
-        if (result == null) {
-          developer.log('No active session found');
-          throw NotFoundException(
-            'No active session found',
-            code: 'NO_ACTIVE_SESSION',
-          );
-        }
+        final result = await repository.endActiveSession(notes: notes);
 
-        if (result.splitOccurred) {
-          developer.log(
-            'Active session ended with splitting: created ${result.totalSessionsCreated} sessions. Final session ID: ${result.finalSessionId}',
-          );
-          return 'Active session ended (crossed midnight - split into ${result.totalSessionsCreated} daily sessions). Final session ID: ${result.finalSessionId}';
-        }
+        return result.when(
+          success: (endSessionResult) {
+            if (endSessionResult == null) {
+              developer.log('No active session found');
+              return Result.failure(
+                NotFoundException(
+                  'No active session found',
+                  code: 'NO_ACTIVE_SESSION',
+                ),
+              );
+            }
 
-        developer.log(
-          'Active session ${result.finalSessionId} ended successfully',
+            if (endSessionResult.splitOccurred) {
+              developer.log(
+                'Active session ended with splitting: created ${endSessionResult.totalSessionsCreated} sessions. Final session ID: ${endSessionResult.finalSessionId}',
+              );
+              return Result.success(
+                'Active session ended (crossed midnight - split into ${endSessionResult.totalSessionsCreated} daily sessions). Final session ID: ${endSessionResult.finalSessionId}',
+              );
+            }
+
+            developer.log(
+              'Active session ${endSessionResult.finalSessionId} ended successfully',
+            );
+            return Result.success('Active session ended successfully');
+          },
+          failure: (error) {
+            developer.log('Failed to end active session: $error');
+            if (error is NotFoundException) {
+              return Result.failure(
+                NotFoundException(
+                  error.message,
+                  code: error.code,
+                  originalError: error.originalError,
+                ),
+              );
+            }
+            if (error is DatabaseException) {
+              return Result.failure(
+                DatabaseException(
+                  error.message,
+                  code: error.code,
+                  originalError: error.originalError,
+                ),
+              );
+            }
+            return Result.failure(
+              DatabaseException(
+                'Failed to end active session: ${error.message}',
+                code: 'DB_UPDATE_FAILED',
+              ),
+            );
+          },
         );
-        return 'Active session ended successfully';
       },
     ),
     Tool(
@@ -139,17 +256,32 @@ List<Tool> getSessionTools(ISessionDatabase db) {
       execute: (args) async {
         final status = args['status'] as String?;
         developer.log('Listing sessions with status filter: $status');
-        List<Session> filtered;
+
+        Result<List<Session>> result;
+
         if (status == 'active') {
-          filtered = await db.getSessionsByEndTimeIsNull();
+          result = await repository.getSessionsByEndTimeIsNull();
         } else if (status == 'completed') {
-          filtered = await db.getSessionsByEndTimeIsNotNull();
+          result = await repository.getSessionsByEndTimeIsNotNull();
         } else {
-          filtered = await db.getAllSessions();
+          result = await repository.getAllSessions();
         }
 
+        if (result.isFailure) {
+          final error = result.error;
+          return Result.failure(
+            DatabaseException(
+              'Failed to get sessions: ${error.message}',
+              code: error.code ?? 'DB_QUERY_FAILED',
+              originalError: error.originalError,
+            ),
+          );
+        }
+
+        final filtered = result.value;
+
         if (filtered.isEmpty) {
-          return 'No sessions found';
+          return Result.success('No sessions found');
         }
 
         final buffer = StringBuffer();
@@ -162,9 +294,9 @@ List<Tool> getSessionTools(ISessionDatabase db) {
             buffer.writeln('    Notes: ${session.notes}');
           }
         }
-        final result = buffer.toString();
+        final resultStr = buffer.toString();
         developer.log('Found ${filtered.length} sessions');
-        return result;
+        return Result.success(resultStr);
       },
     ),
     Tool(
@@ -179,20 +311,55 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        final id = args['session_id'] as int;
-        developer.log('Getting session $id');
-        final session = await db.getSession(id);
-        if (session == null) {
-          developer.log('Session $id not found');
-          throw NotFoundException(
-            'Session $id not found',
-            code: 'SESSION_NOT_FOUND',
+        if (!args.containsKey('session_id')) {
+          return Result.failure(
+            ValidationException(
+              'Missing required parameter: session_id',
+              code: 'MISSING_PARAMETER',
+            ),
           );
         }
-        final result =
+
+        final id = args['session_id'] as int;
+        developer.log('Getting session $id');
+
+        final result = await repository.getSession(id);
+
+        if (result.isFailure) {
+          final error = result.error;
+          if (error is NotFoundException) {
+            return Result.failure(
+              NotFoundException(
+                error.message,
+                code: error.code,
+                originalError: error.originalError,
+              ),
+            );
+          }
+          return Result.failure(
+            DatabaseException(
+              'Failed to get session: ${error.message}',
+              code: error.code ?? 'DB_QUERY_FAILED',
+              originalError: error.originalError,
+            ),
+          );
+        }
+
+        final session = result.value;
+        if (session == null) {
+          developer.log('Session $id not found');
+          return Result.failure(
+            NotFoundException(
+              'Session $id not found',
+              code: 'SESSION_NOT_FOUND',
+            ),
+          );
+        }
+
+        final resultStr =
             'Session $id:\n  Start: ${session.startTime}\n  End: ${session.endTime ?? 'N/A'}\n  Notes: ${session.notes ?? 'None'}';
-        developer.log('Session found: $result');
-        return result;
+        developer.log('Session found: $resultStr');
+        return Result.success(resultStr);
       },
     ),
     Tool(
@@ -207,17 +374,48 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
+        if (!args.containsKey('session_id')) {
+          return Result.failure(
+            ValidationException(
+              'Missing required parameter: session_id',
+              code: 'MISSING_PARAMETER',
+            ),
+          );
+        }
+
         final id = args['session_id'] as int;
         developer.log('Deleting session $id');
-        final result = await db.deleteSession(id);
-        if (result > 0) {
+
+        final result = await repository.deleteSession(id);
+
+        if (result.isFailure) {
+          final error = result.error;
+          if (error is NotFoundException) {
+            return Result.failure(
+              NotFoundException(
+                error.message,
+                code: error.code,
+                originalError: error.originalError,
+              ),
+            );
+          }
+          return Result.failure(
+            DatabaseException(
+              'Failed to delete session: ${error.message}',
+              code: error.code ?? 'DB_DELETE_FAILED',
+              originalError: error.originalError,
+            ),
+          );
+        }
+
+        final rowsAffected = result.value;
+        if (rowsAffected > 0) {
           developer.log('Session $id deleted successfully');
-          return 'Session $id deleted successfully';
+          return Result.success('Session $id deleted successfully');
         }
         developer.log('Session $id not found');
-        throw NotFoundException(
-          'Session $id not found',
-          code: 'SESSION_NOT_FOUND',
+        return Result.failure(
+          NotFoundException('Session $id not found', code: 'SESSION_NOT_FOUND'),
         );
       },
     ),
@@ -228,20 +426,43 @@ List<Tool> getSessionTools(ISessionDatabase db) {
       parameters: [],
       execute: (args) async {
         developer.log('Getting most recent active session');
-        final session = await db.getMostRecentActiveSession();
 
-        if (session == null) {
-          developer.log('No active sessions found');
-          throw NotFoundException(
-            'No active sessions found',
-            code: 'NO_ACTIVE_SESSION',
+        final result = await repository.getMostRecentActiveSession();
+
+        if (result.isFailure) {
+          final error = result.error;
+          if (error is NotFoundException) {
+            return Result.failure(
+              NotFoundException(
+                'No active sessions found',
+                code: 'NO_ACTIVE_SESSION',
+              ),
+            );
+          }
+          return Result.failure(
+            DatabaseException(
+              'Failed to get active session: ${error.message}',
+              code: error.code ?? 'DB_QUERY_FAILED',
+              originalError: error.originalError,
+            ),
           );
         }
 
-        final result =
+        final session = result.value;
+        if (session == null) {
+          developer.log('No active session found');
+          return Result.failure(
+            NotFoundException(
+              'No active sessions found',
+              code: 'NO_ACTIVE_SESSION',
+            ),
+          );
+        }
+
+        final resultStr =
             'Active Session ID: ${session.id}\n  Start: ${session.startTime}\n  Notes: ${session.notes ?? 'None'}';
-        developer.log('Found active session: $result');
-        return result;
+        developer.log('Found active session: $resultStr');
+        return Result.success(resultStr);
       },
     ),
     Tool(
@@ -269,18 +490,59 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
+        if (!args.containsKey('session_id')) {
+          return Result.failure(
+            ValidationException(
+              'Missing required parameter: session_id',
+              code: 'MISSING_PARAMETER',
+            ),
+          );
+        }
+        if (!args.containsKey('notes')) {
+          return Result.failure(
+            ValidationException(
+              'Missing required parameter: notes',
+              code: 'MISSING_PARAMETER',
+            ),
+          );
+        }
+
         final id = args['session_id'] as int;
         final notes = args['notes'] as String;
         final append = args['append'] as bool? ?? true;
 
         developer.log('Updating notes for session $id (append: $append)');
 
-        final session = await db.getSession(id);
+        final getResult = await repository.getSession(id);
+
+        if (getResult.isFailure) {
+          final error = getResult.error;
+          if (error is NotFoundException) {
+            return Result.failure(
+              NotFoundException(
+                error.message,
+                code: error.code,
+                originalError: error.originalError,
+              ),
+            );
+          }
+          return Result.failure(
+            DatabaseException(
+              'Failed to get session: ${error.message}',
+              code: error.code ?? 'DB_QUERY_FAILED',
+              originalError: error.originalError,
+            ),
+          );
+        }
+
+        final session = getResult.value;
         if (session == null) {
           developer.log('Session $id not found');
-          throw NotFoundException(
-            'Session $id not found',
-            code: 'SESSION_NOT_FOUND',
+          return Result.failure(
+            NotFoundException(
+              'Session $id not found',
+              code: 'SESSION_NOT_FOUND',
+            ),
           );
         }
 
@@ -292,16 +554,34 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         }
 
         final updatedSession = session.copyWith(notes: finalNotes);
-        final result = await db.updateSession(updatedSession);
+        final updateResult = await repository.updateSession(updatedSession);
 
-        if (result > 0) {
-          developer.log('Session $id notes updated successfully');
-          return 'Session $id notes updated successfully.\nCurrent notes:\n$finalNotes';
-        }
-        developer.log('Failed to update session $id');
-        throw DatabaseException(
-          'Failed to update session $id',
-          code: 'DB_UPDATE_FAILED',
+        return updateResult.when(
+          success: (rowsAffected) {
+            if (rowsAffected > 0) {
+              developer.log('Session $id notes updated successfully');
+              return Result.success(
+                'Session $id notes updated successfully.\nCurrent notes:\n$finalNotes',
+              );
+            }
+            developer.log('Failed to update session $id');
+            return Result.failure(
+              DatabaseException(
+                'Failed to update session $id',
+                code: 'DB_UPDATE_FAILED',
+              ),
+            );
+          },
+          failure: (error) {
+            developer.log('Failed to update session $id: $error');
+            return Result.failure(
+              DatabaseException(
+                'Failed to update session $id: ${error.message}',
+                code: error.code ?? 'DB_UPDATE_FAILED',
+                originalError: error.originalError,
+              ),
+            );
+          },
         );
       },
     ),

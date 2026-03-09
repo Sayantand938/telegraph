@@ -4,6 +4,7 @@ import 'dart:async';
 import 'tool_definitions.dart';
 import 'tool_service.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:telegraph/core/errors/result.dart';
 
 /// Custom validation function type
 typedef ValidationRule<T> = String? Function(T value);
@@ -343,7 +344,7 @@ class EnhancedToolExecutor {
   }) : _context = context ?? SimpleToolCache();
 
   /// Execute a tool with all enhancements
-  Future<String> executeTool(
+  Future<Result<String>> executeTool(
     String toolName,
     Map<String, dynamic> args, {
     Duration? timeout,
@@ -351,7 +352,7 @@ class EnhancedToolExecutor {
   }) async {
     final stopwatch = Stopwatch()..start();
     ToolExecutionMetrics? metrics;
-    String? result;
+    Result<String>? result;
 
     try {
       // Get tool definition
@@ -370,9 +371,11 @@ class EnhancedToolExecutor {
         final errors = ToolParameterValidator.getInvalid(
           validationResults,
         ).map((r) => r.toString()).join('; ');
-        throw ToolExecutionException(
-          'Parameter validation failed: $errors',
-          toolName: toolName,
+        return Result.failure(
+          ToolExecutionException(
+            'Parameter validation failed: $errors',
+            toolName: toolName,
+          ),
         );
       }
 
@@ -381,7 +384,7 @@ class EnhancedToolExecutor {
         final ttl = cacheTtl ?? defaultCacheTtl!;
         final cacheKey = {'tool': toolName, 'args': args};
         final cached = _context.getFromCache(cacheKey);
-        if (cached != null) {
+        if (cached != null && cached is Result<String>) {
           stopwatch.stop();
           metrics = ToolExecutionMetrics(
             toolName: toolName,
@@ -392,7 +395,7 @@ class EnhancedToolExecutor {
             arguments: args,
           );
           _context.recordMetrics(metrics);
-          return cached as String;
+          return cached;
         }
       }
 
@@ -416,7 +419,8 @@ class EnhancedToolExecutor {
         startTime: DateTime.now().subtract(stopwatch.elapsed),
         endTime: DateTime.now(),
         executionTimeMs: stopwatch.elapsedMilliseconds,
-        success: true,
+        success: result.isSuccess,
+        error: result.isFailure ? result.error.toString() : null,
         arguments: args,
       );
     } catch (e, stackTrace) {
@@ -433,7 +437,15 @@ class EnhancedToolExecutor {
       );
 
       _context.recordError(metrics, stackTrace);
-      rethrow;
+      // Convert any unexpected exceptions to Result.failure
+      result = Result.failure(
+        e is AppException
+            ? e
+            : ToolExecutionException(
+                'Unexpected error: $e',
+                toolName: toolName,
+              ),
+      );
     } finally {
       if (metrics != null) {
         _context.recordMetrics(metrics);
@@ -444,8 +456,8 @@ class EnhancedToolExecutor {
   }
 
   /// Execute with timeout
-  Future<String> _executeWithTimeout(
-    Future<String> Function() action,
+  Future<Result<String>> _executeWithTimeout(
+    Future<Result<String>> Function() action,
     Duration? timeout,
   ) async {
     if (timeout == null) {
@@ -456,9 +468,11 @@ class EnhancedToolExecutor {
       return await Future.any([
         action(),
         Future.delayed(timeout).then((_) {
-          throw ToolExecutionException(
-            'Tool execution timed out after ${timeout.inMilliseconds}ms',
-            toolName: null,
+          return Result.failure(
+            ToolExecutionException(
+              'Tool execution timed out after ${timeout.inMilliseconds}ms',
+              toolName: null,
+            ),
           );
         }),
       ]);
@@ -480,14 +494,19 @@ class EnhancedToolExecutor {
 }
 
 /// Exception thrown during tool execution
-class ToolExecutionException implements Exception {
-  final String message;
-  final String? toolName;
-
-  ToolExecutionException(this.message, {this.toolName});
+class ToolExecutionException extends ToolException {
+  ToolExecutionException(
+    String message, {
+    String? toolName,
+    String? code,
+    dynamic originalError,
+  }) : super(
+         toolName ?? 'unknown',
+         message,
+         code: code,
+         originalError: originalError,
+       );
 
   @override
-  String toString() => toolName != null
-      ? 'ToolExecutionException[$toolName]: $message'
-      : 'ToolExecutionException: $message';
+  String toString() => 'ToolExecutionException[$toolName]: $message';
 }

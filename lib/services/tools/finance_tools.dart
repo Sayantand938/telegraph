@@ -1,11 +1,12 @@
 import 'dart:developer' as developer;
 import 'package:telegraph/models/finance_transaction.dart';
-import 'package:telegraph/services/database/i_finance_database.dart';
+import 'package:telegraph/services/repositories/i_finance_repository.dart';
 import 'package:telegraph/utils/tool_helpers.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:telegraph/core/errors/result.dart';
 import 'tool_definitions.dart';
 
-List<Tool> getFinanceTools(IFinanceDatabase db) {
+List<Tool> getFinanceTools(IFinanceRepository repository) {
   return [
     Tool(
       name: 'add_transaction',
@@ -38,6 +39,24 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
+        // Validate required parameters
+        if (!args.containsKey('type')) {
+          return Result.failure(
+            ValidationException(
+              'Missing required parameter: type',
+              code: 'MISSING_PARAMETER',
+            ),
+          );
+        }
+        if (!args.containsKey('amount')) {
+          return Result.failure(
+            ValidationException(
+              'Missing required parameter: amount',
+              code: 'MISSING_PARAMETER',
+            ),
+          );
+        }
+
         final typeStr = args['type'] as String;
         final amount = args['amount'] as num;
         String? timestamp = args['transaction_time'] as String?;
@@ -47,16 +66,20 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         timestamp ??= DateTime.now().toIso8601String();
 
         if (!isValidIso8601(timestamp)) {
-          throw ValidationException(
-            'Invalid transaction_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
-            code: 'INVALID_DATE_FORMAT',
+          return Result.failure(
+            ValidationException(
+              'Invalid transaction_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
+              code: 'INVALID_DATE_FORMAT',
+            ),
           );
         }
 
         if (amount <= 0) {
-          throw ValidationException(
-            'Amount must be a positive number',
-            code: 'INVALID_AMOUNT',
+          return Result.failure(
+            ValidationException(
+              'Amount must be a positive number',
+              code: 'INVALID_AMOUNT',
+            ),
           );
         }
 
@@ -71,11 +94,26 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           note: note,
         );
 
-        final id = await db.createTransaction(transaction);
-        developer.log('Transaction added successfully with ID: $id');
-
-        final typeLabel = transactionTypeLabel(type);
-        return '$typeLabel transaction recorded (ID: $id)\n  Amount: \$${amount.toStringAsFixed(2)}\n  Time: $timestamp${note != null ? '\n  Note: $note' : ''}';
+        final result = await repository.createTransaction(transaction);
+        return result.when(
+          success: (id) {
+            developer.log('Transaction added successfully with ID: $id');
+            final typeLabel = transactionTypeLabel(type);
+            final message =
+                '$typeLabel transaction recorded (ID: $id)\n  Amount: \$${amount.toStringAsFixed(2)}\n  Time: $timestamp${note != null ? '\n  Note: $note' : ''}';
+            return Result.success(message);
+          },
+          failure: (error) {
+            developer.log('Failed to create transaction: $error');
+            return Result.failure(
+              DatabaseException(
+                error.message,
+                code: error.code,
+                originalError: error.originalError,
+              ),
+            );
+          },
+        );
       },
     ),
     Tool(
@@ -107,27 +145,50 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         final startDateStr = args['start_date'] as String?;
         final endDateStr = args['end_date'] as String?;
 
-        List<FinanceTransaction> transactions;
-
-        if (startDateStr != null && endDateStr != null) {
-          if (!isValidIso8601(startDateStr) || !isValidIso8601(endDateStr)) {
-            throw ValidationException(
-              'Invalid date format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
+        // Validate date formats if provided
+        if (startDateStr != null && !isValidIso8601(startDateStr)) {
+          return Result.failure(
+            ValidationException(
+              'Invalid start_date format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
               code: 'INVALID_DATE_FORMAT',
-            );
-          }
-          final start = DateTime.parse(startDateStr);
-          final end = DateTime.parse(endDateStr);
-          transactions = await db.getTransactionsByDateRange(start, end);
-        } else if (typeStr != null) {
-          final type = parseTransactionType(typeStr);
-          transactions = await db.getTransactionsByType(type);
-        } else {
-          transactions = await db.getAllTransactions();
+            ),
+          );
+        }
+        if (endDateStr != null && !isValidIso8601(endDateStr)) {
+          return Result.failure(
+            ValidationException(
+              'Invalid end_date format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
+              code: 'INVALID_DATE_FORMAT',
+            ),
+          );
         }
 
+        Result<List<FinanceTransaction>> result;
+        if (startDateStr != null && endDateStr != null) {
+          final start = DateTime.parse(startDateStr);
+          final end = DateTime.parse(endDateStr);
+          result = await repository.getTransactionsByDateRange(start, end);
+        } else if (typeStr != null) {
+          final type = parseTransactionType(typeStr);
+          result = await repository.getTransactionsByType(type);
+        } else {
+          result = await repository.getAllTransactions();
+        }
+
+        if (result.isFailure) {
+          return Result.failure(
+            DatabaseException(
+              'Failed to get transactions: ${result.error.message}',
+              code: result.error.code ?? 'DB_QUERY_FAILED',
+              originalError: result.error.originalError,
+            ),
+          );
+        }
+
+        final transactions = result.value;
+
         if (transactions.isEmpty) {
-          return 'No transactions found';
+          return Result.success('No transactions found');
         }
 
         final buffer = StringBuffer();
@@ -160,9 +221,9 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           '  Net: \$${(totalIncome - totalExpense).toStringAsFixed(2)}',
         );
 
-        final result = buffer.toString();
+        final resultStr = buffer.toString();
         developer.log('Listed ${transactions.length} transactions');
-        return result;
+        return Result.success(resultStr);
       },
     ),
     Tool(
@@ -177,21 +238,56 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
-        final id = args['transaction_id'] as int;
-        developer.log('Getting transaction $id');
-        final tx = await db.getTransaction(id);
-        if (tx == null) {
-          developer.log('Transaction $id not found');
-          throw NotFoundException(
-            'Transaction $id not found',
-            code: 'TRANSACTION_NOT_FOUND',
+        if (!args.containsKey('transaction_id')) {
+          return Result.failure(
+            ValidationException(
+              'Missing required parameter: transaction_id',
+              code: 'MISSING_PARAMETER',
+            ),
           );
         }
+
+        final id = args['transaction_id'] as int;
+        developer.log('Getting transaction $id');
+
+        final result = await repository.getTransaction(id);
+
+        if (result.isFailure) {
+          final error = result.error;
+          if (error is NotFoundException) {
+            return Result.failure(
+              NotFoundException(
+                error.message,
+                code: error.code,
+                originalError: error.originalError,
+              ),
+            );
+          }
+          return Result.failure(
+            DatabaseException(
+              'Failed to get transaction: ${error.message}',
+              code: error.code ?? 'DB_QUERY_FAILED',
+              originalError: error.originalError,
+            ),
+          );
+        }
+
+        final tx = result.value;
+        if (tx == null) {
+          developer.log('Transaction $id not found');
+          return Result.failure(
+            NotFoundException(
+              'Transaction $id not found',
+              code: 'TRANSACTION_NOT_FOUND',
+            ),
+          );
+        }
+
         final typeLabel = transactionTypeLabel(tx.type);
-        final result =
+        final resultStr =
             'Transaction $id:\n  Type: $typeLabel\n  Amount: \$${tx.amount.toStringAsFixed(2)}\n  Time: ${tx.transactionTime}\n  Note: ${tx.note ?? 'None'}';
-        developer.log('Transaction found: $result');
-        return result;
+        developer.log('Transaction found: $resultStr');
+        return Result.success(resultStr);
       },
     ),
     Tool(
@@ -206,17 +302,51 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
+        if (!args.containsKey('transaction_id')) {
+          return Result.failure(
+            ValidationException(
+              'Missing required parameter: transaction_id',
+              code: 'MISSING_PARAMETER',
+            ),
+          );
+        }
+
         final id = args['transaction_id'] as int;
         developer.log('Deleting transaction $id');
-        final result = await db.deleteTransaction(id);
-        if (result > 0) {
+
+        final result = await repository.deleteTransaction(id);
+
+        if (result.isFailure) {
+          final error = result.error;
+          if (error is NotFoundException) {
+            return Result.failure(
+              NotFoundException(
+                error.message,
+                code: error.code,
+                originalError: error.originalError,
+              ),
+            );
+          }
+          return Result.failure(
+            DatabaseException(
+              'Failed to delete transaction: ${error.message}',
+              code: error.code ?? 'DB_DELETE_FAILED',
+              originalError: error.originalError,
+            ),
+          );
+        }
+
+        final rowsAffected = result.value;
+        if (rowsAffected > 0) {
           developer.log('Transaction $id deleted successfully');
-          return 'Transaction $id deleted successfully';
+          return Result.success('Transaction $id deleted successfully');
         }
         developer.log('Transaction $id not found');
-        throw NotFoundException(
-          'Transaction $id not found',
-          code: 'TRANSACTION_NOT_FOUND',
+        return Result.failure(
+          NotFoundException(
+            'Transaction $id not found',
+            code: 'TRANSACTION_NOT_FOUND',
+          ),
         );
       },
     ),
@@ -256,15 +386,48 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
+        if (!args.containsKey('transaction_id')) {
+          return Result.failure(
+            ValidationException(
+              'Missing required parameter: transaction_id',
+              code: 'MISSING_PARAMETER',
+            ),
+          );
+        }
+
         final id = args['transaction_id'] as int;
         developer.log('Updating transaction $id');
 
-        final existing = await db.getTransaction(id);
+        final getResult = await repository.getTransaction(id);
+
+        if (getResult.isFailure) {
+          final error = getResult.error;
+          if (error is NotFoundException) {
+            return Result.failure(
+              NotFoundException(
+                error.message,
+                code: error.code,
+                originalError: error.originalError,
+              ),
+            );
+          }
+          return Result.failure(
+            DatabaseException(
+              'Failed to get transaction: ${error.message}',
+              code: error.code ?? 'DB_QUERY_FAILED',
+              originalError: error.originalError,
+            ),
+          );
+        }
+
+        final existing = getResult.value;
         if (existing == null) {
           developer.log('Transaction $id not found');
-          throw NotFoundException(
-            'Transaction $id not found',
-            code: 'TRANSACTION_NOT_FOUND',
+          return Result.failure(
+            NotFoundException(
+              'Transaction $id not found',
+              code: 'TRANSACTION_NOT_FOUND',
+            ),
           );
         }
 
@@ -278,9 +441,11 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         if (args.containsKey('amount')) {
           final amt = args['amount'] as num;
           if (amt <= 0) {
-            throw ValidationException(
-              'Amount must be a positive number',
-              code: 'INVALID_AMOUNT',
+            return Result.failure(
+              ValidationException(
+                'Amount must be a positive number',
+                code: 'INVALID_AMOUNT',
+              ),
             );
           }
           amount = amt.toDouble();
@@ -290,9 +455,11 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         if (args.containsKey('transaction_time')) {
           final ts = args['transaction_time'] as String;
           if (!isValidIso8601(ts)) {
-            throw ValidationException(
-              'Invalid transaction_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
-              code: 'INVALID_DATE_FORMAT',
+            return Result.failure(
+              ValidationException(
+                'Invalid transaction_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)',
+                code: 'INVALID_DATE_FORMAT',
+              ),
             );
           }
           timestamp = ts;
@@ -310,14 +477,31 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           note: note ?? existing.note,
         );
 
-        final result = await db.updateTransaction(updated);
-        if (result > 0) {
-          developer.log('Transaction $id updated successfully');
-          return 'Transaction $id updated successfully';
-        }
-        throw DatabaseException(
-          'Failed to update transaction $id',
-          code: 'DB_UPDATE_FAILED',
+        final updateResult = await repository.updateTransaction(updated);
+        return updateResult.when(
+          success: (rowsAffected) {
+            if (rowsAffected > 0) {
+              developer.log('Transaction $id updated successfully');
+              return Result.success('Transaction $id updated successfully');
+            }
+            developer.log('Failed to update transaction $id');
+            return Result.failure(
+              DatabaseException(
+                'Failed to update transaction $id',
+                code: 'DB_UPDATE_FAILED',
+              ),
+            );
+          },
+          failure: (error) {
+            developer.log('Failed to update transaction $id: $error');
+            return Result.failure(
+              DatabaseException(
+                'Failed to update transaction $id: ${error.message}',
+                code: error.code ?? 'DB_UPDATE_FAILED',
+                originalError: error.originalError,
+              ),
+            );
+          },
         );
       },
     ),
@@ -364,24 +548,50 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
             break;
         }
 
-        double income;
-        double expense;
+        Result<double> incomeResult;
+        Result<double> expenseResult;
 
         if (start != null && end != null) {
-          income = await db.getTotalByType(
+          incomeResult = await repository.getTotalByType(
             TransactionType.income,
             start: start,
             end: end,
           );
-          expense = await db.getTotalByType(
+          expenseResult = await repository.getTotalByType(
             TransactionType.expense,
             start: start,
             end: end,
           );
         } else {
-          income = await db.getTotalByType(TransactionType.income);
-          expense = await db.getTotalByType(TransactionType.expense);
+          incomeResult = await repository.getTotalByType(
+            TransactionType.income,
+          );
+          expenseResult = await repository.getTotalByType(
+            TransactionType.expense,
+          );
         }
+
+        if (incomeResult.isFailure) {
+          return Result.failure(
+            DatabaseException(
+              'Failed to get income total: ${incomeResult.error.message}',
+              code: incomeResult.error.code ?? 'DB_QUERY_FAILED',
+              originalError: incomeResult.error.originalError,
+            ),
+          );
+        }
+        if (expenseResult.isFailure) {
+          return Result.failure(
+            DatabaseException(
+              'Failed to get expense total: ${expenseResult.error.message}',
+              code: expenseResult.error.code ?? 'DB_QUERY_FAILED',
+              originalError: expenseResult.error.originalError,
+            ),
+          );
+        }
+
+        final income = incomeResult.value;
+        final expense = expenseResult.value;
 
         final buffer = StringBuffer();
         buffer.writeln(
@@ -393,9 +603,9 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           '  Net Balance: \$${(income - expense).toStringAsFixed(2)}',
         );
 
-        final result = buffer.toString();
+        final resultStr = buffer.toString();
         developer.log('Generated financial summary for period: $period');
-        return result;
+        return Result.success(resultStr);
       },
     ),
   ];

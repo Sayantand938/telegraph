@@ -1,3 +1,5 @@
+import 'package:telegraph/core/errors/result.dart';
+
 class ToolParameter {
   final String name;
   final String type;
@@ -25,7 +27,7 @@ class Tool {
   final String name;
   final String description;
   final List<ToolParameter> parameters;
-  final Future<String> Function(Map<String, dynamic> args) execute;
+  final Future<Result<String>> Function(Map<String, dynamic> args) execute;
 
   Tool({
     required this.name,

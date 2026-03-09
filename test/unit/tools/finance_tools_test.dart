@@ -4,14 +4,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:telegraph/services/tools/finance_tools.dart';
 import 'package:telegraph/services/tools/tool_definitions.dart';
-import 'package:telegraph/services/database/i_finance_database.dart';
+import 'package:telegraph/services/repositories/i_finance_repository.dart';
 import 'package:telegraph/models/finance_transaction.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:telegraph/core/errors/result.dart';
 import '../../fixtures/sample_data.dart';
 import '../../fixtures/mocks.dart';
 
 void main() {
-  late MockFinanceDatabase mockFinanceDb;
+  late MockFinanceRepository mockFinanceRepo;
   late List<Tool> financeTools;
 
   setUpAll(() {
@@ -28,8 +29,8 @@ void main() {
   });
 
   setUp(() {
-    mockFinanceDb = MockFinanceDatabase();
-    financeTools = getFinanceTools(mockFinanceDb);
+    mockFinanceRepo = MockFinanceRepository();
+    financeTools = getFinanceTools(mockFinanceRepo);
   });
 
   group('Finance Tools', () {
@@ -37,8 +38,8 @@ void main() {
       test('adds income transaction successfully', () async {
         // Arrange
         when(
-          () => mockFinanceDb.createTransaction(any()),
-        ).thenAnswer((_) async => 1);
+          () => mockFinanceRepo.createTransaction(any()),
+        ).thenAnswer((_) async => Result.success(1));
 
         // Act
         final result = await financeTools
@@ -58,8 +59,8 @@ void main() {
       test('adds expense transaction successfully', () async {
         // Arrange
         when(
-          () => mockFinanceDb.createTransaction(any()),
-        ).thenAnswer((_) async => 2);
+          () => mockFinanceRepo.createTransaction(any()),
+        ).thenAnswer((_) async => Result.success(2));
 
         // Act
         final result = await financeTools
@@ -111,8 +112,8 @@ void main() {
       test('uses current time when transaction_time not provided', () async {
         // Arrange
         when(
-          () => mockFinanceDb.createTransaction(any()),
-        ).thenAnswer((_) async => 1);
+          () => mockFinanceRepo.createTransaction(any()),
+        ).thenAnswer((_) async => Result.success(1));
 
         // Act
         final result = await financeTools
@@ -121,6 +122,22 @@ void main() {
 
         // Assert
         expect(result, contains('Expense transaction recorded'));
+      });
+
+      test('handles database failure', () async {
+        // Arrange
+        when(() => mockFinanceRepo.createTransaction(any())).thenAnswer(
+          (_) async =>
+              Result.failure(DatabaseException('DB error', code: 'DB_ERROR')),
+        );
+
+        // Act & Assert
+        expect(
+          () async => await financeTools
+              .firstWhere((t) => t.name == 'add_transaction')
+              .execute({'type': 'income', 'amount': 100.0}),
+          throwsA(isA<DatabaseException>()),
+        );
       });
     });
 
@@ -132,8 +149,8 @@ void main() {
           FinanceTransactionFixtures.expenseTransaction(id: 2, amount: 50.0),
         ];
         when(
-          () => mockFinanceDb.getAllTransactions(),
-        ).thenAnswer((_) async => transactions);
+          () => mockFinanceRepo.getAllTransactions(),
+        ).thenAnswer((_) async => Result.success(transactions));
 
         // Act
         final result = await financeTools
@@ -159,8 +176,8 @@ void main() {
           ),
         ];
         when(
-          () => mockFinanceDb.getTransactionsByType(TransactionType.income),
-        ).thenAnswer((_) async => [transactions[0]]);
+          () => mockFinanceRepo.getTransactionsByType(TransactionType.income),
+        ).thenAnswer((_) async => Result.success([transactions[0]]));
 
         // Act
         final result = await financeTools
@@ -183,8 +200,8 @@ void main() {
           ),
         ];
         when(
-          () => mockFinanceDb.getTransactionsByType(TransactionType.expense),
-        ).thenAnswer((_) async => [transactions[1]]);
+          () => mockFinanceRepo.getTransactionsByType(TransactionType.expense),
+        ).thenAnswer((_) async => Result.success([transactions[1]]));
 
         // Act
         final result = await financeTools
@@ -207,8 +224,8 @@ void main() {
           ),
         ];
         when(
-          () => mockFinanceDb.getTransactionsByDateRange(any(), any()),
-        ).thenAnswer((_) async => transactions);
+          () => mockFinanceRepo.getTransactionsByDateRange(any(), any()),
+        ).thenAnswer((_) async => Result.success(transactions));
 
         // Act
         final result = await financeTools
@@ -226,8 +243,8 @@ void main() {
       test('returns "No transactions found" when empty', () async {
         // Arrange
         when(
-          () => mockFinanceDb.getAllTransactions(),
-        ).thenAnswer((_) async => []);
+          () => mockFinanceRepo.getAllTransactions(),
+        ).thenAnswer((_) async => Result.success([]));
 
         // Act
         final result = await financeTools
@@ -248,8 +265,8 @@ void main() {
           note: 'Bonus',
         );
         when(
-          () => mockFinanceDb.getTransaction(1),
-        ).thenAnswer((_) async => transaction);
+          () => mockFinanceRepo.getTransaction(1),
+        ).thenAnswer((_) async => Result.success(transaction));
 
         // Act
         final result = await financeTools
@@ -268,8 +285,8 @@ void main() {
         () async {
           // Arrange
           when(
-            () => mockFinanceDb.getTransaction(999),
-          ).thenAnswer((_) async => null);
+            () => mockFinanceRepo.getTransaction(999),
+          ).thenAnswer((_) async => Result.success(null));
 
           // Act & Assert
           expect(
@@ -292,8 +309,8 @@ void main() {
       test('returns success message when transaction deleted', () async {
         // Arrange
         when(
-          () => mockFinanceDb.deleteTransaction(1),
-        ).thenAnswer((_) async => 1);
+          () => mockFinanceRepo.deleteTransaction(1),
+        ).thenAnswer((_) async => Result.success(1));
 
         // Act
         final result = await financeTools
@@ -309,8 +326,8 @@ void main() {
         () async {
           // Arrange
           when(
-            () => mockFinanceDb.deleteTransaction(999),
-          ).thenAnswer((_) async => 0);
+            () => mockFinanceRepo.deleteTransaction(999),
+          ).thenAnswer((_) async => Result.success(0));
 
           // Act & Assert
           expect(
@@ -337,11 +354,11 @@ void main() {
           amount: 100.0,
         );
         when(
-          () => mockFinanceDb.getTransaction(1),
-        ).thenAnswer((_) async => existing);
+          () => mockFinanceRepo.getTransaction(1),
+        ).thenAnswer((_) async => Result.success(existing));
         when(
-          () => mockFinanceDb.updateTransaction(any()),
-        ).thenAnswer((_) async => 1);
+          () => mockFinanceRepo.updateTransaction(any()),
+        ).thenAnswer((_) async => Result.success(1));
 
         // Act
         final result = await financeTools
@@ -359,8 +376,8 @@ void main() {
       test('throws NotFoundException when transaction not found', () async {
         // Arrange
         when(
-          () => mockFinanceDb.getTransaction(999),
-        ).thenAnswer((_) async => null);
+          () => mockFinanceRepo.getTransaction(999),
+        ).thenAnswer((_) async => Result.success(null));
 
         // Act & Assert
         expect(
@@ -381,8 +398,8 @@ void main() {
         // Arrange
         final existing = FinanceTransactionFixtures.incomeTransaction(id: 1);
         when(
-          () => mockFinanceDb.getTransaction(1),
-        ).thenAnswer((_) async => existing);
+          () => mockFinanceRepo.getTransaction(1),
+        ).thenAnswer((_) async => Result.success(existing));
 
         // Act & Assert
         expect(
@@ -403,8 +420,8 @@ void main() {
         // Arrange
         final existing = FinanceTransactionFixtures.incomeTransaction(id: 1);
         when(
-          () => mockFinanceDb.getTransaction(1),
-        ).thenAnswer((_) async => existing);
+          () => mockFinanceRepo.getTransaction(1),
+        ).thenAnswer((_) async => Result.success(existing));
 
         // Act & Assert
         expect(
@@ -429,11 +446,11 @@ void main() {
       test('returns summary for all transactions', () async {
         // Arrange
         when(
-          () => mockFinanceDb.getTotalByType(TransactionType.income),
-        ).thenAnswer((_) async => 500.0);
+          () => mockFinanceRepo.getTotalByType(TransactionType.income),
+        ).thenAnswer((_) async => Result.success(500.0));
         when(
-          () => mockFinanceDb.getTotalByType(TransactionType.expense),
-        ).thenAnswer((_) async => 200.0);
+          () => mockFinanceRepo.getTotalByType(TransactionType.expense),
+        ).thenAnswer((_) async => Result.success(200.0));
 
         // Act
         final result = await financeTools
@@ -450,19 +467,19 @@ void main() {
       test('returns summary for today', () async {
         // Arrange
         when(
-          () => mockFinanceDb.getTotalByType(
+          () => mockFinanceRepo.getTotalByType(
             TransactionType.income,
             start: any(named: 'start'),
             end: any(named: 'end'),
           ),
-        ).thenAnswer((_) async => 50.0);
+        ).thenAnswer((_) async => Result.success(50.0));
         when(
-          () => mockFinanceDb.getTotalByType(
+          () => mockFinanceRepo.getTotalByType(
             TransactionType.expense,
             start: any(named: 'start'),
             end: any(named: 'end'),
           ),
-        ).thenAnswer((_) async => 25.0);
+        ).thenAnswer((_) async => Result.success(25.0));
 
         // Act
         final result = await financeTools
@@ -476,19 +493,19 @@ void main() {
       test('returns summary for week', () async {
         // Arrange
         when(
-          () => mockFinanceDb.getTotalByType(
+          () => mockFinanceRepo.getTotalByType(
             TransactionType.income,
             start: any(named: 'start'),
             end: any(named: 'end'),
           ),
-        ).thenAnswer((_) async => 300.0);
+        ).thenAnswer((_) async => Result.success(300.0));
         when(
-          () => mockFinanceDb.getTotalByType(
+          () => mockFinanceRepo.getTotalByType(
             TransactionType.expense,
             start: any(named: 'start'),
             end: any(named: 'end'),
           ),
-        ).thenAnswer((_) async => 150.0);
+        ).thenAnswer((_) async => Result.success(150.0));
 
         // Act
         final result = await financeTools
@@ -502,19 +519,19 @@ void main() {
       test('returns summary for month', () async {
         // Arrange
         when(
-          () => mockFinanceDb.getTotalByType(
+          () => mockFinanceRepo.getTotalByType(
             TransactionType.income,
             start: any(named: 'start'),
             end: any(named: 'end'),
           ),
-        ).thenAnswer((_) async => 1000.0);
+        ).thenAnswer((_) async => Result.success(1000.0));
         when(
-          () => mockFinanceDb.getTotalByType(
+          () => mockFinanceRepo.getTotalByType(
             TransactionType.expense,
             start: any(named: 'start'),
             end: any(named: 'end'),
           ),
-        ).thenAnswer((_) async => 500.0);
+        ).thenAnswer((_) async => Result.success(500.0));
 
         // Act
         final result = await financeTools
@@ -528,19 +545,19 @@ void main() {
       test('returns summary for year', () async {
         // Arrange
         when(
-          () => mockFinanceDb.getTotalByType(
+          () => mockFinanceRepo.getTotalByType(
             TransactionType.income,
             start: any(named: 'start'),
             end: any(named: 'end'),
           ),
-        ).thenAnswer((_) async => 5000.0);
+        ).thenAnswer((_) async => Result.success(5000.0));
         when(
-          () => mockFinanceDb.getTotalByType(
+          () => mockFinanceRepo.getTotalByType(
             TransactionType.expense,
             start: any(named: 'start'),
             end: any(named: 'end'),
           ),
-        ).thenAnswer((_) async => 2500.0);
+        ).thenAnswer((_) async => Result.success(2500.0));
 
         // Act
         final result = await financeTools

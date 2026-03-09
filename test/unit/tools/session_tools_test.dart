@@ -2,14 +2,16 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:telegraph/services/tools/session_tools.dart';
 import 'package:telegraph/services/tools/tool_definitions.dart';
-import 'package:telegraph/services/database/i_session_database.dart';
+import 'package:telegraph/services/repositories/i_session_repository.dart';
 import 'package:telegraph/models/session.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:telegraph/core/errors/result.dart';
+import 'package:telegraph/services/database/i_session_database.dart';
 import '../../fixtures/sample_data.dart';
 import '../../fixtures/mocks.dart';
 
 void main() {
-  late MockSessionDatabase mockSessionDb;
+  late MockSessionRepository mockSessionRepo;
   late List<Tool> sessionTools;
 
   setUpAll(() {
@@ -20,8 +22,8 @@ void main() {
   });
 
   setUp(() {
-    mockSessionDb = MockSessionDatabase();
-    sessionTools = getSessionTools(mockSessionDb);
+    mockSessionRepo = MockSessionRepository();
+    sessionTools = getSessionTools(mockSessionRepo);
   });
 
   group('Session Tools', () {
@@ -29,18 +31,18 @@ void main() {
       test('returns success message when session created', () async {
         // Arrange
         when(
-          () => mockSessionDb.getSessionsByEndTimeIsNull(),
-        ).thenAnswer((_) async => []);
+          () => mockSessionRepo.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => Result.success([]));
         when(
-          () => mockSessionDb.hasOverlap(any(), any()),
-        ).thenAnswer((_) async => false);
+          () => mockSessionRepo.hasOverlap(any(), any()),
+        ).thenAnswer((_) async => Result.success(false));
         when(
-          () => mockSessionDb.createSession(
+          () => mockSessionRepo.createSession(
             notes: any(named: 'notes'),
             startTime: any(named: 'startTime'),
             endTime: any(named: 'endTime'),
           ),
-        ).thenAnswer((_) async => 1);
+        ).thenAnswer((_) async => Result.success(1));
 
         // Act
         final result = await sessionTools
@@ -83,9 +85,9 @@ void main() {
 
       test('prevents starting session when active session exists', () async {
         // Arrange
-        when(
-          () => mockSessionDb.getSessionsByEndTimeIsNull(),
-        ).thenAnswer((_) async => [SessionFixtures.activeSession()]);
+        when(() => mockSessionRepo.getSessionsByEndTimeIsNull()).thenAnswer(
+          (_) async => Result.success([SessionFixtures.activeSession()]),
+        );
 
         // Act & Assert
         expect(
@@ -105,11 +107,11 @@ void main() {
       test('prevents starting session when time overlap detected', () async {
         // Arrange
         when(
-          () => mockSessionDb.getSessionsByEndTimeIsNull(),
-        ).thenAnswer((_) async => []);
+          () => mockSessionRepo.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => Result.success([]));
         when(
-          () => mockSessionDb.hasOverlap(any(), any()),
-        ).thenAnswer((_) async => true);
+          () => mockSessionRepo.hasOverlap(any(), any()),
+        ).thenAnswer((_) async => Result.success(true));
 
         // Act & Assert
         expect(
@@ -125,6 +127,34 @@ void main() {
           ),
         );
       });
+
+      test('handles database failure in createSession', () async {
+        // Arrange
+        when(
+          () => mockSessionRepo.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => Result.success([]));
+        when(
+          () => mockSessionRepo.hasOverlap(any(), any()),
+        ).thenAnswer((_) async => Result.success(false));
+        when(
+          () => mockSessionRepo.createSession(
+            notes: any(named: 'notes'),
+            startTime: any(named: 'startTime'),
+            endTime: any(named: 'endTime'),
+          ),
+        ).thenAnswer(
+          (_) async =>
+              Result.failure(DatabaseException('DB error', code: 'DB_ERROR')),
+        );
+
+        // Act & Assert
+        expect(
+          () async => await sessionTools
+              .firstWhere((t) => t.name == 'start_session')
+              .execute({'notes': 'Test session'}),
+          throwsA(isA<DatabaseException>()),
+        );
+      });
     });
 
     group('end_session', () {
@@ -132,16 +162,18 @@ void main() {
         // Arrange
         final activeSession = SessionFixtures.activeSession().copyWith(id: 1);
         when(
-          () => mockSessionDb.getSessionsByEndTimeIsNull(),
-        ).thenAnswer((_) async => [activeSession]);
+          () => mockSessionRepo.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => Result.success([activeSession]));
         when(
-          () => mockSessionDb.endActiveSession(notes: any(named: 'notes')),
+          () => mockSessionRepo.endActiveSession(notes: any(named: 'notes')),
         ).thenAnswer(
-          (_) async => EndSessionResult(
-            originalSessionId: 1,
-            finalSessionId: 1,
-            totalSessionsCreated: 1,
-            splitOccurred: false,
+          (_) async => Result.success(
+            EndSessionResult(
+              originalSessionId: 1,
+              finalSessionId: 1,
+              totalSessionsCreated: 1,
+              splitOccurred: false,
+            ),
           ),
         );
 
@@ -157,11 +189,11 @@ void main() {
       test('throws NotFoundException when no active session found', () async {
         // Arrange
         when(
-          () => mockSessionDb.getSessionsByEndTimeIsNull(),
-        ).thenAnswer((_) async => []);
+          () => mockSessionRepo.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => Result.success([]));
         when(
-          () => mockSessionDb.endActiveSession(notes: any(named: 'notes')),
-        ).thenAnswer((_) async => null);
+          () => mockSessionRepo.endActiveSession(notes: any(named: 'notes')),
+        ).thenAnswer((_) async => Result.success(null));
 
         // Act & Assert
         expect(
@@ -184,16 +216,18 @@ void main() {
           id: 1,
         );
         when(
-          () => mockSessionDb.getSessionsByEndTimeIsNull(),
-        ).thenAnswer((_) async => [multiDaySession]);
+          () => mockSessionRepo.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => Result.success([multiDaySession]));
         when(
-          () => mockSessionDb.endActiveSession(notes: any(named: 'notes')),
+          () => mockSessionRepo.endActiveSession(notes: any(named: 'notes')),
         ).thenAnswer(
-          (_) async => EndSessionResult(
-            originalSessionId: 1,
-            finalSessionId: 3,
-            totalSessionsCreated: 3,
-            splitOccurred: true,
+          (_) async => Result.success(
+            EndSessionResult(
+              originalSessionId: 1,
+              finalSessionId: 3,
+              totalSessionsCreated: 3,
+              splitOccurred: true,
+            ),
           ),
         );
 
@@ -215,8 +249,8 @@ void main() {
           SessionFixtures.completedSession().copyWith(id: 2),
         ];
         when(
-          () => mockSessionDb.getAllSessions(),
-        ).thenAnswer((_) async => sessions);
+          () => mockSessionRepo.getAllSessions(),
+        ).thenAnswer((_) async => Result.success(sessions));
 
         // Act
         final result = await sessionTools
@@ -240,8 +274,8 @@ void main() {
             .where((s) => s.endTime == null)
             .toList();
         when(
-          () => mockSessionDb.getSessionsByEndTimeIsNull(),
-        ).thenAnswer((_) async => activeSessions);
+          () => mockSessionRepo.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => Result.success(activeSessions));
 
         // Act
         final result = await sessionTools
@@ -264,8 +298,8 @@ void main() {
             .where((s) => s.endTime != null)
             .toList();
         when(
-          () => mockSessionDb.getSessionsByEndTimeIsNotNull(),
-        ).thenAnswer((_) async => completedSessions);
+          () => mockSessionRepo.getSessionsByEndTimeIsNotNull(),
+        ).thenAnswer((_) async => Result.success(completedSessions));
 
         // Act
         final result = await sessionTools
@@ -279,7 +313,9 @@ void main() {
 
       test('returns "No sessions found" when empty', () async {
         // Arrange
-        when(() => mockSessionDb.getAllSessions()).thenAnswer((_) async => []);
+        when(
+          () => mockSessionRepo.getAllSessions(),
+        ).thenAnswer((_) async => Result.success([]));
 
         // Act
         final result = await sessionTools
@@ -296,8 +332,8 @@ void main() {
         // Arrange
         final session = SessionFixtures.completedSession().copyWith(id: 1);
         when(
-          () => mockSessionDb.getSession(1),
-        ).thenAnswer((_) async => session);
+          () => mockSessionRepo.getSession(1),
+        ).thenAnswer((_) async => Result.success(session));
 
         // Act
         final result = await sessionTools
@@ -312,7 +348,9 @@ void main() {
 
       test('throws NotFoundException when session does not exist', () async {
         // Arrange
-        when(() => mockSessionDb.getSession(999)).thenAnswer((_) async => null);
+        when(
+          () => mockSessionRepo.getSession(999),
+        ).thenAnswer((_) async => Result.success(null));
 
         // Act & Assert
         expect(
@@ -333,7 +371,9 @@ void main() {
     group('delete_session', () {
       test('returns success message when session deleted', () async {
         // Arrange
-        when(() => mockSessionDb.deleteSession(1)).thenAnswer((_) async => 1);
+        when(
+          () => mockSessionRepo.deleteSession(1),
+        ).thenAnswer((_) async => Result.success(1));
 
         // Act
         final result = await sessionTools
@@ -346,7 +386,9 @@ void main() {
 
       test('throws NotFoundException when session does not exist', () async {
         // Arrange
-        when(() => mockSessionDb.deleteSession(999)).thenAnswer((_) async => 0);
+        when(
+          () => mockSessionRepo.deleteSession(999),
+        ).thenAnswer((_) async => Result.success(0));
 
         // Act & Assert
         expect(
@@ -377,9 +419,9 @@ void main() {
             startTime: '2025-01-15T10:00:00Z',
           ),
         ];
-        when(
-          () => mockSessionDb.getMostRecentActiveSession(),
-        ).thenAnswer((_) async => sessions[1]); // Most recent (ID 2)
+        when(() => mockSessionRepo.getMostRecentActiveSession()).thenAnswer(
+          (_) async => Result.success(sessions[1]),
+        ); // Most recent (ID 2)
 
         // Act
         final result = await sessionTools
@@ -393,8 +435,8 @@ void main() {
       test('throws NotFoundException when no active session exists', () async {
         // Arrange
         when(
-          () => mockSessionDb.getMostRecentActiveSession(),
-        ).thenAnswer((_) async => null);
+          () => mockSessionRepo.getMostRecentActiveSession(),
+        ).thenAnswer((_) async => Result.success(null));
 
         // Act & Assert
         expect(
@@ -420,11 +462,11 @@ void main() {
           notes: null,
         );
         when(
-          () => mockSessionDb.getSession(1),
-        ).thenAnswer((_) async => session);
+          () => mockSessionRepo.getSession(1),
+        ).thenAnswer((_) async => Result.success(session));
         when(
-          () => mockSessionDb.updateSession(any()),
-        ).thenAnswer((_) async => 1);
+          () => mockSessionRepo.updateSession(any()),
+        ).thenAnswer((_) async => Result.success(1));
 
         // Act
         final result = await sessionTools
@@ -442,11 +484,11 @@ void main() {
           notes: 'Original',
         );
         when(
-          () => mockSessionDb.getSession(1),
-        ).thenAnswer((_) async => session);
+          () => mockSessionRepo.getSession(1),
+        ).thenAnswer((_) async => Result.success(session));
         when(
-          () => mockSessionDb.updateSession(any()),
-        ).thenAnswer((_) async => 1);
+          () => mockSessionRepo.updateSession(any()),
+        ).thenAnswer((_) async => Result.success(1));
 
         // Act
         final result = await sessionTools
@@ -466,11 +508,11 @@ void main() {
           notes: 'Original',
         );
         when(
-          () => mockSessionDb.getSession(1),
-        ).thenAnswer((_) async => session);
+          () => mockSessionRepo.getSession(1),
+        ).thenAnswer((_) async => Result.success(session));
         when(
-          () => mockSessionDb.updateSession(any()),
-        ).thenAnswer((_) async => 1);
+          () => mockSessionRepo.updateSession(any()),
+        ).thenAnswer((_) async => Result.success(1));
 
         // Act
         final result = await sessionTools
@@ -485,7 +527,9 @@ void main() {
 
       test('throws NotFoundException when session not found', () async {
         // Arrange
-        when(() => mockSessionDb.getSession(999)).thenAnswer((_) async => null);
+        when(
+          () => mockSessionRepo.getSession(999),
+        ).thenAnswer((_) async => Result.success(null));
 
         // Act & Assert
         expect(

@@ -2,30 +2,28 @@ import 'llm_client.dart';
 import 'package:telegraph/services/tools/tool_service.dart';
 import 'dart:developer' as developer;
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:telegraph/core/errors/result.dart';
 
-/// Result of a tool execution
+/// Result of a tool execution - now using Result pattern
 class ToolExecutionResult {
   final String toolName;
-  final String result;
-  final bool success;
-  final String? error;
+  final Result<String> result;
   final int? executionTimeMs;
 
   ToolExecutionResult({
     required this.toolName,
     required this.result,
-    required this.success,
-    this.error,
     this.executionTimeMs,
   });
 
   @override
   String toString() {
-    if (success) {
-      return 'ToolExecutionResult(tool: $toolName, result: $result, time: ${executionTimeMs}ms)';
-    } else {
-      return 'ToolExecutionResult(tool: $toolName, error: $error, time: ${executionTimeMs}ms)';
-    }
+    return result.when(
+      success: (value) =>
+          'ToolExecutionResult(tool: $toolName, result: $value, time: ${executionTimeMs}ms)',
+      failure: (error) =>
+          'ToolExecutionResult(tool: $toolName, error: $error, time: ${executionTimeMs}ms)',
+    );
   }
 }
 
@@ -73,7 +71,6 @@ class ToolExecutor {
       return ToolExecutionResult(
         toolName: toolCall.name,
         result: result,
-        success: true,
         executionTimeMs: stopwatch.elapsedMilliseconds,
       );
     } catch (e, stackTrace) {
@@ -93,9 +90,7 @@ class ToolExecutor {
 
       return ToolExecutionResult(
         toolName: toolCall.name,
-        result: '',
-        success: false,
-        error: exception.toString(),
+        result: Result.failure(exception),
         executionTimeMs: stopwatch.elapsedMilliseconds,
       );
     }
@@ -104,13 +99,14 @@ class ToolExecutor {
   /// Convert tool execution results to messages that can be added to conversation history
   List<LlmMessage> resultsToMessages(List<ToolExecutionResult> results) {
     return results.map((result) {
-      if (result.success) {
-        return LlmMessage.tool(result.result);
-      } else {
-        // Convert error to user-friendly message
-        final errorMessage = result.error ?? 'Unknown error';
-        return LlmMessage.tool('Error: $errorMessage');
-      }
+      return result.result.when(
+        success: (content) => LlmMessage.tool(content),
+        failure: (error) {
+          // Convert error to user-friendly message
+          final errorMessage = error.toString();
+          return LlmMessage.tool('Error: $errorMessage');
+        },
+      );
     }).toList();
   }
 }

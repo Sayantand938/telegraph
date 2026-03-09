@@ -1,34 +1,38 @@
 import 'package:telegraph/models/finance_transaction.dart';
+import 'package:telegraph/core/errors/result.dart';
 
 /// High-level repository interface for finance operations.
 /// Abstracts away database implementation details from business logic.
+/// All methods return Result<T> for type-safe error handling.
 abstract class IFinanceRepository {
   /// Creates a new transaction
-  Future<int> createTransaction(FinanceTransaction transaction);
+  Future<Result<int>> createTransaction(FinanceTransaction transaction);
 
   /// Retrieves a transaction by ID
-  Future<FinanceTransaction?> getTransaction(int id);
+  Future<Result<FinanceTransaction?>> getTransaction(int id);
 
   /// Retrieves all transactions
-  Future<List<FinanceTransaction>> getAllTransactions();
+  Future<Result<List<FinanceTransaction>>> getAllTransactions();
 
   /// Updates a transaction
-  Future<int> updateTransaction(FinanceTransaction transaction);
+  Future<Result<int>> updateTransaction(FinanceTransaction transaction);
 
   /// Deletes a transaction by ID
-  Future<int> deleteTransaction(int id);
+  Future<Result<int>> deleteTransaction(int id);
 
   /// Retrieves transactions filtered by type
-  Future<List<FinanceTransaction>> getTransactionsByType(TransactionType type);
+  Future<Result<List<FinanceTransaction>>> getTransactionsByType(
+    TransactionType type,
+  );
 
   /// Retrieves transactions within a date range
-  Future<List<FinanceTransaction>> getTransactionsByDateRange(
+  Future<Result<List<FinanceTransaction>>> getTransactionsByDateRange(
     DateTime start,
     DateTime end,
   );
 
   /// Calculates total amount for a given type, optionally within a date range
-  Future<double> getTotalByType(
+  Future<Result<double>> getTotalByType(
     TransactionType type, {
     DateTime? start,
     DateTime? end,

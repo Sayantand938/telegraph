@@ -3,6 +3,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:telegraph/models/finance_transaction.dart';
 import 'package:telegraph/services/repositories/i_finance_repository.dart';
+import 'package:telegraph/core/errors/result.dart';
 import '../../test/support/database_test_helper.dart';
 
 void main() {
@@ -34,11 +35,30 @@ void main() {
       );
 
       // Act
-      final id = await repository.createTransaction(transaction);
-      final retrieved = await repository.getTransaction(id!);
+      final createResult = await repository.createTransaction(transaction);
+      final id = createResult.when(
+        success: (id) => id,
+        failure: (error) => fail('Failed to create transaction: $error'),
+      );
+
+      final getResult = await repository.getTransaction(id);
 
       // Assert
-      expect(retrieved, isNotNull);
+      expect(
+        getResult,
+        isA<Result<FinanceTransaction?>>().having(
+          (result) =>
+              result.when(success: (tx) => tx, failure: (error) => null),
+          'transaction',
+          isNotNull,
+        ),
+      );
+
+      final retrieved = getResult.when(
+        success: (tx) => tx,
+        failure: (error) => fail('Failed to get transaction: $error'),
+      );
+
       expect(retrieved!.type, TransactionType.income);
       expect(retrieved.amount, 100.0);
       expect(retrieved.transactionTime, '2025-01-15T12:00:00Z');
@@ -52,7 +72,11 @@ void main() {
         amount: 50.0,
         transactionTime: '2025-01-15T12:00:00Z',
       );
-      final id = await repository.createTransaction(transaction);
+      final createResult = await repository.createTransaction(transaction);
+      final id = createResult.when(
+        success: (id) => id,
+        failure: (error) => fail('Failed to create transaction: $error'),
+      );
 
       // Act
       final updated = transaction.copyWith(
@@ -60,10 +84,20 @@ void main() {
         amount: 75.0,
         note: 'Updated note',
       );
-      await repository.updateTransaction(updated);
-      final retrieved = await repository.getTransaction(id!);
+      final updateResult = await repository.updateTransaction(updated);
+      final int updateCount = updateResult.when(
+        success: (count) => count,
+        failure: (error) => fail('Failed to update transaction: $error'),
+      );
+      expect(updateCount, greaterThan(0));
+
+      final getResult = await repository.getTransaction(id);
 
       // Assert
+      final retrieved = getResult.when(
+        success: (tx) => tx,
+        failure: (error) => fail('Failed to get transaction: $error'),
+      );
       expect(retrieved!.amount, 75.0);
       expect(retrieved.note, 'Updated note');
     });
@@ -75,13 +109,27 @@ void main() {
         amount: 200.0,
         transactionTime: '2025-01-15T12:00:00Z',
       );
-      final id = await repository.createTransaction(transaction);
+      final createResult = await repository.createTransaction(transaction);
+      final id = createResult.when(
+        success: (id) => id,
+        failure: (error) => fail('Failed to create transaction: $error'),
+      );
 
       // Act
-      await repository.deleteTransaction(id!);
-      final retrieved = await repository.getTransaction(id);
+      final deleteResult = await repository.deleteTransaction(id);
+      final int rowsAffected = deleteResult.when(
+        success: (count) => count,
+        failure: (error) => fail('Failed to delete transaction: $error'),
+      );
+      expect(rowsAffected, greaterThan(0));
+
+      final getResult = await repository.getTransaction(id);
 
       // Assert
+      final retrieved = getResult.when(
+        success: (tx) => tx,
+        failure: (error) => fail('Failed to get transaction: $error'),
+      );
       expect(retrieved, isNull);
     });
 
@@ -104,9 +152,13 @@ void main() {
       );
 
       // Act
-      final all = await repository.getAllTransactions();
+      final allResult = await repository.getAllTransactions();
 
       // Assert
+      final all = allResult.when(
+        success: (transactions) => transactions,
+        failure: (error) => fail('Failed to get all transactions: $error'),
+      );
       expect(all.length, 2);
     });
 
@@ -129,14 +181,23 @@ void main() {
       );
 
       // Act
-      final income = await repository.getTransactionsByType(
+      final incomeResult = await repository.getTransactionsByType(
         TransactionType.income,
       );
-      final expenses = await repository.getTransactionsByType(
+      final expensesResult = await repository.getTransactionsByType(
         TransactionType.expense,
       );
 
       // Assert
+      final income = incomeResult.when(
+        success: (transactions) => transactions,
+        failure: (error) => fail('Failed to get income transactions: $error'),
+      );
+      final expenses = expensesResult.when(
+        success: (transactions) => transactions,
+        failure: (error) => fail('Failed to get expense transactions: $error'),
+      );
+
       expect(income.length, 1);
       expect(income.first.amount, 100.0);
       expect(expenses.length, 1);
@@ -165,12 +226,17 @@ void main() {
       );
 
       // Act
-      final inRange = await repository.getTransactionsByDateRange(
+      final inRangeResult = await repository.getTransactionsByDateRange(
         now.subtract(const Duration(hours: 1)),
         tomorrow,
       );
 
       // Assert
+      final inRange = inRangeResult.when(
+        success: (transactions) => transactions,
+        failure: (error) =>
+            fail('Failed to get transactions by date range: $error'),
+      );
       expect(inRange.length, 1);
       expect(inRange.first.amount, 50.0);
     });
@@ -201,14 +267,23 @@ void main() {
       );
 
       // Act
-      final incomeTotal = await repository.getTotalByType(
+      final incomeTotalResult = await repository.getTotalByType(
         TransactionType.income,
       );
-      final expenseTotal = await repository.getTotalByType(
+      final expenseTotalResult = await repository.getTotalByType(
         TransactionType.expense,
       );
 
       // Assert
+      final incomeTotal = incomeTotalResult.when(
+        success: (total) => total,
+        failure: (error) => fail('Failed to get income total: $error'),
+      );
+      final expenseTotal = expenseTotalResult.when(
+        success: (total) => total,
+        failure: (error) => fail('Failed to get expense total: $error'),
+      );
+
       expect(incomeTotal, 300.0);
       expect(expenseTotal, 50.0);
     });
@@ -234,13 +309,18 @@ void main() {
       );
 
       // Act
-      final todayTotal = await repository.getTotalByType(
+      final todayTotalResult = await repository.getTotalByType(
         TransactionType.income,
         start: now.subtract(const Duration(hours: 1)),
         end: now.add(const Duration(hours: 1)),
       );
 
       // Assert
+      final todayTotal = todayTotalResult.when(
+        success: (total) => total,
+        failure: (error) => fail('Failed to get today total: $error'),
+      );
+
       expect(todayTotal, 200.0);
     });
   });

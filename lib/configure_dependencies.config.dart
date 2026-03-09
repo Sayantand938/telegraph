@@ -16,6 +16,8 @@ import 'services/database/finance_database.dart' as _i646;
 import 'services/database/i_finance_database.dart' as _i81;
 import 'services/database/i_session_database.dart' as _i7;
 import 'services/database/session_database.dart' as _i27;
+import 'services/repositories/i_finance_repository.dart' as _i111;
+import 'services/repositories/i_session_repository.dart' as _i306;
 import 'services/tools/tool_service.dart' as _i378;
 
 extension GetItInjectableX on _i174.GetIt {
@@ -29,8 +31,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i7.ISessionDatabase>(() => _i27.SessionDatabase());
     gh.factory<_i378.ToolService>(
       () => _i378.ToolService(
-        gh<_i7.ISessionDatabase>(),
-        gh<_i81.IFinanceDatabase>(),
+        gh<_i306.ISessionRepository>(),
+        gh<_i111.IFinanceRepository>(),
       ),
     );
     return this;
