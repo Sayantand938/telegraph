@@ -2,7 +2,21 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:io';
 import 'dart:developer' as developer;
-import '../../models/session.dart';
+import 'package:telegraph/models/session.dart';
+
+class EndSessionResult {
+  final int originalSessionId;
+  final int finalSessionId;
+  final int totalSessionsCreated;
+  final bool splitOccurred;
+
+  EndSessionResult({
+    required this.originalSessionId,
+    required this.finalSessionId,
+    required this.totalSessionsCreated,
+    required this.splitOccurred,
+  });
+}
 
 class SessionDatabase {
   static final SessionDatabase _instance = SessionDatabase._internal();
@@ -156,18 +170,96 @@ class SessionDatabase {
     );
   }
 
-  Future<int> endSession(int id, {String? notes}) async {
+  Future<EndSessionResult?> endActiveSession({String? notes}) async {
+    final allSessions = await getAllSessions();
+    final activeSessions = allSessions.where((s) => s.endTime == null).toList();
+
+    if (activeSessions.isEmpty) {
+      return null;
+    }
+
+    // End the most recent active session
+    activeSessions.sort((a, b) => b.startTime.compareTo(a.startTime));
+    final session = activeSessions.first;
+    final id = session.id!;
+
+    return await endSession(id, notes: notes);
+  }
+
+  Future<EndSessionResult?> endSession(int id, {String? notes}) async {
     final session = await getSession(id);
-    if (session == null) return 0;
+    if (session == null) {
+      return null;
+    }
+    if (session.endTime != null) {
+      return null; // Already ended
+    }
 
-    final now = DateTime.now().toIso8601String();
-    // Only update notes if the session doesn't already have notes
-    final updatedNotes = session.notes?.isNotEmpty == true
-        ? session.notes
-        : notes;
-    final updatedSession = session.copyWith(endTime: now, notes: updatedNotes);
+    final now = DateTime.now();
+    final start = DateTime.parse(session.startTime);
 
-    return await updateSession(updatedSession);
+    // Check if the session is within the same day
+    if (start.year == now.year &&
+        start.month == now.month &&
+        start.day == now.day) {
+      // Same day: simple update
+      final updatedNotes = session.notes?.isNotEmpty == true
+          ? session.notes
+          : notes;
+      final updatedSession = session.copyWith(
+        endTime: now.toIso8601String(),
+        notes: updatedNotes,
+      );
+      await updateSession(updatedSession);
+      return EndSessionResult(
+        originalSessionId: id,
+        finalSessionId: id,
+        totalSessionsCreated: 1,
+        splitOccurred: false,
+      );
+    } else {
+      // Multi-day: split into daily sessions
+      await deleteSession(id);
+
+      int count = 0;
+      int lastInsertedId = 0;
+      DateTime currentStart = start;
+
+      while (currentStart.isBefore(now)) {
+        count++;
+        DateTime nextMidnight = DateTime(
+          currentStart.year,
+          currentStart.month,
+          currentStart.day + 1,
+        );
+        DateTime segmentEnd = nextMidnight.isBefore(now) ? nextMidnight : now;
+
+        String? segmentNotes;
+        if (count == 1) {
+          segmentNotes = session.notes;
+        } else if (segmentEnd == now) {
+          segmentNotes = notes;
+        } else {
+          segmentNotes = "Split from session $id";
+        }
+
+        lastInsertedId = await createSession(
+          startTime: currentStart.toIso8601String(),
+          endTime: segmentEnd.toIso8601String(),
+          notes: segmentNotes,
+        );
+
+        if (segmentEnd == now) break;
+        currentStart = segmentEnd;
+      }
+
+      return EndSessionResult(
+        originalSessionId: id,
+        finalSessionId: lastInsertedId,
+        totalSessionsCreated: count,
+        splitOccurred: true,
+      );
+    }
   }
 
   Future<int> deleteSession(int id) async {

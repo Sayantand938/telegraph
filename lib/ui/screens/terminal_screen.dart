@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import '../../models/chat_entry.dart';
-import '../../services/ai/llm_service.dart';
+import 'package:telegraph/models/chat_entry.dart';
+import 'package:telegraph/services/ai/llm_service.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});

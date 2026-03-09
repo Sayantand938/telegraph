@@ -1,5 +1,5 @@
-import '../../models/session.dart';
-import '../../services/database/session_database.dart';
+import 'package:telegraph/models/session.dart';
+import 'package:telegraph/services/database/session_database.dart';
 import 'dart:developer' as developer;
 
 class ToolParameter {
@@ -103,17 +103,13 @@ class ToolService {
           String? endTime = args['end_time'] as String?;
 
           // Default start time to now if not provided
-          if (startTime == null) {
-            startTime = DateTime.now().toIso8601String();
-          }
+          startTime ??= DateTime.now().toIso8601String();
 
-          // Validate time format if provided
-          if (startTime != null) {
-            try {
-              DateTime.parse(startTime);
-            } catch (e) {
-              return 'Invalid start_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
-            }
+          // Validate time format
+          try {
+            DateTime.parse(startTime);
+          } catch (e) {
+            return 'Invalid start_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
           }
           if (endTime != null) {
             try {
@@ -163,14 +159,8 @@ class ToolService {
     ),
     Tool(
       name: 'end_session',
-      description: 'End a session by ID with optional notes',
+      description: 'End the currently active session with optional notes',
       parameters: [
-        ToolParameter(
-          name: 'session_id',
-          type: 'integer',
-          description: 'The ID of the session to end',
-          required: true,
-        ),
         ToolParameter(
           name: 'notes',
           type: 'string',
@@ -180,29 +170,26 @@ class ToolService {
       ],
       execute: (args) async {
         try {
-          final id = args['session_id'] as int;
-
-          // Check if session exists and is active
-          final session = await _db.getSession(id);
-          if (session == null) {
-            developer.log('Session $id not found');
-            return 'Session $id not found';
-          }
-
-          if (session.endTime != null) {
-            developer.log('Session $id is already ended');
-            return 'Session $id is already ended (ended at: ${session.endTime})';
-          }
-
           final notes = args['notes'] as String?;
-          developer.log('Ending session $id with notes: $notes');
-          final result = await _db.endSession(id, notes: notes);
-          if (result > 0) {
-            developer.log('Session $id ended successfully');
-            return 'Session $id ended successfully';
+          developer.log('Ending active session with notes: $notes');
+          final result = await _db.endActiveSession(notes: notes);
+
+          if (result == null) {
+            developer.log('No active session found');
+            return 'No active session found';
           }
-          developer.log('Session $id not found');
-          return 'Session $id not found';
+
+          if (result.splitOccurred) {
+            developer.log(
+              'Active session ended with splitting: created ${result.totalSessionsCreated} sessions. Final session ID: ${result.finalSessionId}',
+            );
+            return 'Active session ended (crossed midnight - split into ${result.totalSessionsCreated} daily sessions). Final session ID: ${result.finalSessionId}';
+          }
+
+          developer.log(
+            'Active session ${result.finalSessionId} ended successfully',
+          );
+          return 'Active session ended successfully';
         } catch (e, stackTrace) {
           developer.log('Error ending session: $e', stackTrace: stackTrace);
           return 'Error ending session: $e';
