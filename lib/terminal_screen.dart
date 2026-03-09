@@ -92,19 +92,17 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   Future<bool> _processCommand(String command, String fullInput) async {
     switch (command) {
-      case 'help':
-      case '/help':
-        final response = ChatEntry(
-          text: '''Available commands:
-  /help  - Show this message
-  /clear - Clear the screen
-  /health - Check if AI is online
-  /model - Show current model name
-  echo  - Repeat text (e.g., echo hello)
-  date  - Show current date/time
-  exit  - "Close" terminal''',
-          type: ChatEntryType.system,
-        );
+    case '/help':
+      final response = ChatEntry(
+        text: '''Available commands:
+/help  - Show this message
+/clear - Clear the screen
+/health - Check if AI is online
+/model - Show current model name
+/echo  - Repeat text (e.g., /echo hello)
+/date  - Show current date/time''',
+        type: ChatEntryType.system,
+      );
         setState(() {
           _history.add(response);
         });
@@ -115,18 +113,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
           _history.clear();
         });
         return true;
-      case 'date':
+      case '/date':
         final response = ChatEntry(
           text: DateTime.now().toString(),
-          type: ChatEntryType.system,
-        );
-        setState(() {
-          _history.add(response);
-        });
-        return true;
-      case 'exit':
-        final response = ChatEntry(
-          text: 'System: Exit command received. Goodbye.',
           type: ChatEntryType.system,
         );
         setState(() {
@@ -156,9 +145,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
         });
         return true;
       default:
-        if (command.startsWith('echo ')) {
+        if (command.startsWith('/echo ')) {
           final response = ChatEntry(
-            text: fullInput.substring(5),
+            text: fullInput.substring(6),
             type: ChatEntryType.system,
           );
           setState(() {
