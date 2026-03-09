@@ -1,9 +1,9 @@
 import 'dart:developer' as developer;
 import 'package:telegraph/models/finance_transaction.dart';
-import 'package:telegraph/services/database/finance_database.dart';
+import 'package:telegraph/services/database/i_finance_database.dart';
 import 'tool_definitions.dart';
 
-List<Tool> getFinanceTools(FinanceDatabase db) {
+List<Tool> getFinanceTools(IFinanceDatabase db) {
   return [
     Tool(
       name: 'add_transaction',

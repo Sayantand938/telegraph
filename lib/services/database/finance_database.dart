@@ -1,12 +1,13 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:telegraph/models/finance_transaction.dart';
 import 'base_database.dart';
+import 'i_finance_database.dart';
+import 'package:injectable/injectable.dart';
 
-class FinanceDatabase extends BaseDatabase<FinanceTransaction> {
-  static final FinanceDatabase _instance = FinanceDatabase._internal();
-  factory FinanceDatabase() => _instance;
-  FinanceDatabase._internal()
-    : super('telegraph_finance.db', 'FinanceDatabase');
+@LazySingleton(as: IFinanceDatabase)
+class FinanceDatabase extends BaseDatabase<FinanceTransaction>
+    implements IFinanceDatabase {
+  FinanceDatabase() : super('telegraph_finance.db', 'FinanceDatabase');
 
   @override
   String get tableName => 'finance_transactions';
@@ -35,14 +36,20 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction> {
   }
 
   // Wrapper methods for backward compatibility
+  @override
   Future<int> createTransaction(FinanceTransaction transaction) async =>
       create(transaction);
+  @override
   Future<FinanceTransaction?> getTransaction(int id) async => get(id);
+  @override
   Future<List<FinanceTransaction>> getAllTransactions() async => getAll();
+  @override
   Future<int> updateTransaction(FinanceTransaction transaction) async =>
       update(transaction);
+  @override
   Future<int> deleteTransaction(int id) async => delete(id);
 
+  @override
   Future<List<FinanceTransaction>> getTransactionsByType(
     TransactionType type,
   ) async {
@@ -50,6 +57,7 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction> {
     return all.where((tx) => tx.type == type).toList();
   }
 
+  @override
   Future<List<FinanceTransaction>> getTransactionsByDateRange(
     DateTime start,
     DateTime end,
@@ -62,6 +70,7 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction> {
     }).toList();
   }
 
+  @override
   Future<double> getTotalByType(
     TransactionType type, {
     DateTime? start,

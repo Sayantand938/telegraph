@@ -1,9 +1,9 @@
 import 'dart:developer' as developer;
 import 'package:telegraph/models/session.dart';
-import 'package:telegraph/services/database/session_database.dart';
+import 'package:telegraph/services/database/i_session_database.dart';
 import 'tool_definitions.dart';
 
-List<Tool> getSessionTools(SessionDatabase db) {
+List<Tool> getSessionTools(ISessionDatabase db) {
   return [
     Tool(
       name: 'start_session',

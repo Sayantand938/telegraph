@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:telegraph/services/tools/tool_service.dart';
+import 'package:get_it/get_it.dart';
 
 class AiResponse {
   final String? reasoning;
@@ -83,7 +84,7 @@ class LlmService {
       'Content-Type': 'application/json',
     };
 
-    final toolService = ToolService();
+    final toolService = GetIt.instance<ToolService>();
     final tools = toolService.getToolSchemas();
 
     final payload = {
@@ -197,7 +198,7 @@ class LlmService {
       'Content-Type': 'application/json',
     };
 
-    final toolService = ToolService();
+    final toolService = GetIt.instance<ToolService>();
     final tools = toolService.getToolSchemas();
 
     final payload = {

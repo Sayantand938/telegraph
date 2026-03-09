@@ -2,25 +2,13 @@ import 'package:sqflite/sqflite.dart';
 import 'dart:developer' as developer;
 import 'package:telegraph/models/session.dart';
 import 'base_database.dart';
+import 'i_session_database.dart';
+import 'package:injectable/injectable.dart';
 
-class EndSessionResult {
-  final int originalSessionId;
-  final int finalSessionId;
-  final int totalSessionsCreated;
-  final bool splitOccurred;
-
-  EndSessionResult({
-    required this.originalSessionId,
-    required this.finalSessionId,
-    required this.totalSessionsCreated,
-    required this.splitOccurred,
-  });
-}
-
-class SessionDatabase extends BaseDatabase<Session> {
-  static final SessionDatabase _instance = SessionDatabase._internal();
-  factory SessionDatabase() => _instance;
-  SessionDatabase._internal() : super('telegraph.db', 'SessionDatabase');
+@LazySingleton(as: ISessionDatabase)
+class SessionDatabase extends BaseDatabase<Session>
+    implements ISessionDatabase {
+  SessionDatabase() : super('telegraph.db', 'SessionDatabase');
 
   @override
   String get tableName => 'sessions';
@@ -48,7 +36,9 @@ class SessionDatabase extends BaseDatabase<Session> {
   }
 
   // Wrapper methods for backward compatibility
+  @override
   Future<List<Session>> getAllSessions() async => getAll();
+  @override
   Future<int> createSession({
     String? notes,
     String? startTime,
@@ -60,10 +50,14 @@ class SessionDatabase extends BaseDatabase<Session> {
     );
   }
 
+  @override
   Future<Session?> getSession(int id) async => get(id);
+  @override
   Future<int> updateSession(Session session) async => update(session);
+  @override
   Future<int> deleteSession(int id) async => delete(id);
 
+  @override
   Future<EndSessionResult?> endActiveSession({String? notes}) async {
     final allSessions = await getAll();
     final activeSessions = allSessions.where((s) => s.endTime == null).toList();
@@ -79,6 +73,7 @@ class SessionDatabase extends BaseDatabase<Session> {
     return await endSession(id, notes: notes);
   }
 
+  @override
   Future<EndSessionResult?> endSession(int id, {String? notes}) async {
     final session = await get(id);
     if (session == null) {
@@ -156,6 +151,7 @@ class SessionDatabase extends BaseDatabase<Session> {
     }
   }
 
+  @override
   Future<bool> hasOverlap(String start, String? end, {int? excludeId}) async {
     final allSessions = await getAll();
 

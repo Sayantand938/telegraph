@@ -1,9 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:telegraph/configure_dependencies.dart';
 import 'package:telegraph/ui/app.dart';
 
-void main() async {
+void main() {
+  // Initialize dependency injection FIRST
+  configureDependencies();
+
   // Ensure Flutter bindings are initialized before using async code
   WidgetsFlutterBinding.ensureInitialized();
 

@@ -1,16 +1,16 @@
-import 'package:telegraph/services/database/session_database.dart';
-import 'package:telegraph/services/database/finance_database.dart';
+import 'package:telegraph/services/database/i_session_database.dart';
+import 'package:telegraph/services/database/i_finance_database.dart';
 import 'tool_definitions.dart';
 import 'session_tools.dart';
 import 'finance_tools.dart';
+import 'package:injectable/injectable.dart';
 
+@injectable
 class ToolService {
-  static final ToolService _instance = ToolService._internal();
-  factory ToolService() => _instance;
-  ToolService._internal();
+  final ISessionDatabase _sessionDb;
+  final IFinanceDatabase _financeDb;
 
-  final SessionDatabase _sessionDb = SessionDatabase();
-  final FinanceDatabase _financeDb = FinanceDatabase();
+  ToolService(this._sessionDb, this._financeDb);
 
   List<Tool> get tools => [
     ...getSessionTools(_sessionDb),
