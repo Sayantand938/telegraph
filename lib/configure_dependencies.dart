@@ -14,7 +14,7 @@ import 'services/repositories/finance_repository_impl.dart';
 import 'services/database/i_session_database.dart';
 import 'services/repositories/i_session_repository.dart';
 import 'services/repositories/session_repository_impl.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'core/config/app_config.dart';
 
 final getIt = GetIt.instance;
 
@@ -23,27 +23,24 @@ final getIt = GetIt.instance;
   preferRelativeImports: true,
   asExtension: true,
 )
-Future<void> configureDependencies() async {
+Future<void> configureDependencies(AppConfig config) async {
   // Initialize generated dependencies
   getIt.init();
 
-  // Load environment variables
-  await dotenv.load(fileName: '.env');
-
-  // Register AI services
-  _registerAIServices();
+  // Register AI services with configuration
+  _registerAIServices(config);
 
   // Register repositories
   _registerRepositories();
 }
 
-void _registerAIServices() {
+void _registerAIServices(AppConfig config) {
   // Register LlmClient as singleton
   getIt.registerLazySingleton<ILlmClient>(
     () => LlmClient(
-      baseUrl: dotenv.get('BASE_URL'),
-      apiKey: dotenv.get('NVIDIA_API_KEY'),
-      model: dotenv.get('MODEL'),
+      baseUrl: config.baseUrl,
+      apiKey: config.apiKey,
+      model: config.model,
     ),
   );
 
