@@ -182,6 +182,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
+    _nimService.clearHistory();
     super.dispose();
   }
 

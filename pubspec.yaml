@@ -40,6 +40,9 @@ dependencies:
   http: ^1.2.0
   flutter_dotenv: ^5.1.0
   flutter_markdown: ^0.6.18
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  sqflite_common_ffi: ^2.3.0
 
 dev_dependencies:
   flutter_test:
