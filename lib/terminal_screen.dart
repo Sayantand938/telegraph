@@ -46,27 +46,29 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
     try {
       // Check if it's a built-in command
-      ChatEntry? response = await _processCommand(command, input);
+      final wasHandled = await _processCommand(command, input);
 
       // If not a built-in command, send to AI
-      if (response == null) {
+      if (!wasHandled) {
         final aiResponse = await _nimService.sendMessage(input);
-        response = ChatEntry(
+        final response = ChatEntry(
           text: aiResponse.content,
           reasoning: aiResponse.reasoning,
           type: ChatEntryType.ai,
         );
-      }
 
-      setState(() {
-        if (response != null) {
+        setState(() {
           _history.add(response);
-        }
-        if (response != null && response.text.isNotEmpty) {
-          _history.add(ChatEntry(text: '', type: ChatEntryType.blank));
-        }
-        _isProcessing = false;
-      });
+          if (response.text.isNotEmpty) {
+            _history.add(ChatEntry(text: '', type: ChatEntryType.blank));
+          }
+          _isProcessing = false;
+        });
+      } else {
+        setState(() {
+          _isProcessing = false;
+        });
+      }
     } catch (e) {
       setState(() {
         _history.add(ChatEntry(
@@ -80,47 +82,91 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
     _controller.clear();
     _scrollToBottom();
-    _focusNode.requestFocus();
+    // Request focus after the frame is rendered to ensure it works
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _focusNode.requestFocus();
+      }
+    });
   }
 
-  Future<ChatEntry?> _processCommand(String command, String fullInput) async {
+  Future<bool> _processCommand(String command, String fullInput) async {
     switch (command) {
       case 'help':
-        return ChatEntry(
+      case '/help':
+        final response = ChatEntry(
           text: '''Available commands:
-  help  - Show this message
-  clear - Clear the screen
+  /help  - Show this message
+  /clear - Clear the screen
+  /health - Check if AI is online
+  /model - Show current model name
   echo  - Repeat text (e.g., echo hello)
   date  - Show current date/time
   exit  - "Close" terminal''',
           type: ChatEntryType.system,
         );
+        setState(() {
+          _history.add(response);
+        });
+        return true;
       case 'clear':
+      case '/clear':
         setState(() {
           _history.clear();
         });
-        return null;
+        return true;
       case 'date':
-        return ChatEntry(
+        final response = ChatEntry(
           text: DateTime.now().toString(),
           type: ChatEntryType.system,
         );
-      case 'exit':
         setState(() {
-          _history.add(ChatEntry(
-            text: 'System: Exit command received. Goodbye.',
-            type: ChatEntryType.system,
-          ));
+          _history.add(response);
         });
-        return null;
+        return true;
+      case 'exit':
+        final response = ChatEntry(
+          text: 'System: Exit command received. Goodbye.',
+          type: ChatEntryType.system,
+        );
+        setState(() {
+          _history.add(response);
+        });
+        return true;
+      case '/health':
+        final isHealthy = await _nimService.healthCheck();
+        final response = ChatEntry(
+          text: isHealthy
+              ? '✓ AI service is online and responding'
+              : '✗ AI service is offline or unreachable',
+          type: isHealthy ? ChatEntryType.system : ChatEntryType.error,
+        );
+        setState(() {
+          _history.add(response);
+        });
+        return true;
+      case '/model':
+        final modelName = _nimService.getModelName();
+        final response = ChatEntry(
+          text: 'Current model: $modelName',
+          type: ChatEntryType.system,
+        );
+        setState(() {
+          _history.add(response);
+        });
+        return true;
       default:
         if (command.startsWith('echo ')) {
-          return ChatEntry(
+          final response = ChatEntry(
             text: fullInput.substring(5),
             type: ChatEntryType.system,
           );
+          setState(() {
+            _history.add(response);
+          });
+          return true;
         }
-        return null;
+        return false;
     }
   }
 

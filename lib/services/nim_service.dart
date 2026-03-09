@@ -30,6 +30,33 @@ class NimService {
     _initialized = true;
   }
 
+  Future<bool> healthCheck() async {
+    if (!_initialized) {
+      await initialize();
+    }
+
+    try {
+      final url = '$_baseUrl/models';
+      final headers = {
+        'Authorization': 'Bearer $_apiKey',
+        'Accept': 'application/json',
+      };
+
+      final response = await http.get(Uri.parse(url), headers: headers);
+
+      return response.statusCode == 200;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  String getModelName() {
+    if (!_initialized) {
+      throw Exception('Service not initialized. Call initialize() first.');
+    }
+    return _model;
+  }
+
   Future<AiResponse> sendMessage(String message, {bool stream = false}) async {
     if (!_initialized) {
       await initialize();
@@ -51,7 +78,7 @@ class NimService {
       'temperature': 0.60,
       'top_p': 0.95,
       'stream': stream,
-      'chat_template_kwargs': {'enable_thinking': true},
+      'chat_template_kwargs': {'enable_thinking': false},
     };
 
     try {
