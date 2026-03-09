@@ -3,9 +3,11 @@ import 'package:telegraph/services/database/i_finance_database.dart';
 import 'package:telegraph/services/repositories/i_finance_repository.dart';
 import 'package:telegraph/core/errors/result.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:injectable/injectable.dart';
 
 /// Concrete implementation of IFinanceRepository.
 /// Delegates to IFinanceDatabase for data access and wraps errors in Result.
+@LazySingleton(as: IFinanceRepository)
 class FinanceRepository implements IFinanceRepository {
   final IFinanceDatabase _database;
 

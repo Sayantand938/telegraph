@@ -3,9 +3,11 @@ import 'package:telegraph/services/database/i_session_database.dart';
 import 'package:telegraph/services/repositories/i_session_repository.dart';
 import 'package:telegraph/core/errors/result.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:injectable/injectable.dart';
 
 /// Concrete implementation of ISessionRepository.
 /// Delegates to ISessionDatabase for data access and wraps errors in Result.
+@LazySingleton(as: ISessionRepository)
 class SessionRepository implements ISessionRepository {
   final ISessionDatabase _database;
 
