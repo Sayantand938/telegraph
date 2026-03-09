@@ -27,7 +27,9 @@ void main() {
     group('start_session', () {
       test('returns success message when session created', () async {
         // Arrange
-        when(() => mockSessionDb.getAllSessions()).thenAnswer((_) async => []);
+        when(
+          () => mockSessionDb.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => []);
         when(
           () => mockSessionDb.hasOverlap(any(), any()),
         ).thenAnswer((_) async => false);
@@ -67,7 +69,7 @@ void main() {
       test('prevents starting session when active session exists', () async {
         // Arrange
         when(
-          () => mockSessionDb.getAllSessions(),
+          () => mockSessionDb.getSessionsByEndTimeIsNull(),
         ).thenAnswer((_) async => [SessionFixtures.activeSession()]);
 
         // Act
@@ -81,7 +83,9 @@ void main() {
 
       test('prevents starting session when time overlap detected', () async {
         // Arrange
-        when(() => mockSessionDb.getAllSessions()).thenAnswer((_) async => []);
+        when(
+          () => mockSessionDb.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => []);
         when(
           () => mockSessionDb.hasOverlap(any(), any()),
         ).thenAnswer((_) async => true);
@@ -104,7 +108,7 @@ void main() {
         // Arrange
         final activeSession = SessionFixtures.activeSession().copyWith(id: 1);
         when(
-          () => mockSessionDb.getAllSessions(),
+          () => mockSessionDb.getSessionsByEndTimeIsNull(),
         ).thenAnswer((_) async => [activeSession]);
         when(
           () => mockSessionDb.endActiveSession(notes: any(named: 'notes')),
@@ -128,7 +132,9 @@ void main() {
 
       test('returns message when no active session found', () async {
         // Arrange
-        when(() => mockSessionDb.getAllSessions()).thenAnswer((_) async => []);
+        when(
+          () => mockSessionDb.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => []);
         when(
           () => mockSessionDb.endActiveSession(notes: any(named: 'notes')),
         ).thenAnswer((_) async => null);
@@ -148,7 +154,7 @@ void main() {
           id: 1,
         );
         when(
-          () => mockSessionDb.getAllSessions(),
+          () => mockSessionDb.getSessionsByEndTimeIsNull(),
         ).thenAnswer((_) async => [multiDaySession]);
         when(
           () => mockSessionDb.endActiveSession(notes: any(named: 'notes')),
@@ -199,9 +205,13 @@ void main() {
           SessionFixtures.activeSession().copyWith(id: 1),
           SessionFixtures.completedSession().copyWith(id: 2),
         ];
+        // Only active sessions should be returned by getSessionsByEndTimeIsNull
+        final activeSessions = sessions
+            .where((s) => s.endTime == null)
+            .toList();
         when(
-          () => mockSessionDb.getAllSessions(),
-        ).thenAnswer((_) async => sessions);
+          () => mockSessionDb.getSessionsByEndTimeIsNull(),
+        ).thenAnswer((_) async => activeSessions);
 
         // Act
         final result = await sessionTools
@@ -219,9 +229,13 @@ void main() {
           SessionFixtures.activeSession().copyWith(id: 1),
           SessionFixtures.completedSession().copyWith(id: 2),
         ];
+        // Only completed sessions should be returned by getSessionsByEndTimeIsNotNull
+        final completedSessions = sessions
+            .where((s) => s.endTime != null)
+            .toList();
         when(
-          () => mockSessionDb.getAllSessions(),
-        ).thenAnswer((_) async => sessions);
+          () => mockSessionDb.getSessionsByEndTimeIsNotNull(),
+        ).thenAnswer((_) async => completedSessions);
 
         // Act
         final result = await sessionTools
@@ -322,8 +336,8 @@ void main() {
           ),
         ];
         when(
-          () => mockSessionDb.getAllSessions(),
-        ).thenAnswer((_) async => sessions);
+          () => mockSessionDb.getMostRecentActiveSession(),
+        ).thenAnswer((_) async => sessions[1]); // Most recent (ID 2)
 
         // Act
         final result = await sessionTools
@@ -336,9 +350,9 @@ void main() {
 
       test('returns "No active sessions found" when none exist', () async {
         // Arrange
-        when(() => mockSessionDb.getAllSessions()).thenAnswer(
-          (_) async => [SessionFixtures.completedSession().copyWith(id: 1)],
-        );
+        when(
+          () => mockSessionDb.getMostRecentActiveSession(),
+        ).thenAnswer((_) async => null);
 
         // Act
         final result = await sessionTools

@@ -42,6 +42,44 @@ class SessionDatabase extends BaseDatabase<Session>
   // Wrapper methods for backward compatibility
   @override
   Future<List<Session>> getAllSessions() async => getAll();
+
+  @override
+  Future<List<Session>> getSessionsByEndTimeIsNull() async {
+    final db = await database;
+    final maps = await db.query(
+      tableName,
+      where: 'end_time IS NULL',
+      orderBy: 'start_time DESC',
+    );
+    return maps.map(fromMap).toList();
+  }
+
+  @override
+  Future<List<Session>> getSessionsByEndTimeIsNotNull() async {
+    final db = await database;
+    final maps = await db.query(
+      tableName,
+      where: 'end_time IS NOT NULL',
+      orderBy: 'start_time DESC',
+    );
+    return maps.map(fromMap).toList();
+  }
+
+  @override
+  Future<Session?> getMostRecentActiveSession() async {
+    final db = await database;
+    final maps = await db.query(
+      tableName,
+      where: 'end_time IS NULL',
+      orderBy: 'start_time DESC',
+      limit: 1,
+    );
+    if (maps.isNotEmpty) {
+      return fromMap(maps.first);
+    }
+    return null;
+  }
+
   @override
   Future<int> createSession({
     String? notes,
@@ -63,14 +101,13 @@ class SessionDatabase extends BaseDatabase<Session>
 
   @override
   Future<EndSessionResult?> endActiveSession({String? notes}) async {
-    final allSessions = await getAll();
-    final activeSessions = allSessions.where((s) => s.endTime == null).toList();
+    final activeSessions = await getSessionsByEndTimeIsNull();
 
     if (activeSessions.isEmpty) {
       return null;
     }
 
-    activeSessions.sort((a, b) => b.startTime.compareTo(a.startTime));
+    // Already sorted by start_time DESC from query
     final session = activeSessions.first;
     final id = session.id!;
 
@@ -157,47 +194,49 @@ class SessionDatabase extends BaseDatabase<Session>
 
   @override
   Future<bool> hasOverlap(String start, String? end, {int? excludeId}) async {
-    final allSessions = await getAll();
-
     final newStart = DateTime.parse(start);
     final newEnd = end != null ? DateTime.parse(end) : null;
+    final db = await database;
 
-    for (final map in allSessions) {
-      final session = map;
+    // Build WHERE clause based on overlap logic
+    // Overlap occurs when:
+    // - existing session is active (end_time IS NULL) and newStart >= existing.start_time
+    // - OR existing session has end_time and newStart < existing.end_time AND newEnd > existing.start_time
+    String whereClause;
+    List<dynamic> whereArgs;
 
-      if (excludeId != null && session.id == excludeId) {
-        continue;
-      }
-
-      final existingStart = DateTime.parse(session.startTime);
-      final existingEnd = session.endTime != null
-          ? DateTime.parse(session.endTime!)
-          : null;
-
-      bool overlap = false;
-
-      if (existingEnd == null) {
-        overlap =
-            newStart.isAfter(existingStart) ||
-            newStart.isAtSameMomentAs(existingStart);
-      } else if (newEnd == null) {
-        overlap =
-            existingStart.isAfter(newStart) ||
-            existingStart.isAtSameMomentAs(newStart);
-      } else {
-        overlap =
-            newStart.isBefore(existingEnd) && existingStart.isBefore(newEnd);
-      }
-
-      if (overlap) {
-        developer.log(
-          'Overlap detected: new [$start, $end] overlaps with existing session ${session.id} [${session.startTime}, ${session.endTime}]',
-          name: 'SessionDatabase',
-        );
-        return true;
-      }
+    if (newEnd == null) {
+      // New session is active: overlaps with any active session that started at or before newStart
+      whereClause = 'end_time IS NULL AND start_time <= ?';
+      whereArgs = [start];
+    } else {
+      // New session has end time: overlaps with active sessions or sessions that overlap in time
+      whereClause =
+          '(end_time IS NULL AND start_time <= ?) OR (end_time IS NOT NULL AND ? < end_time AND ? > start_time)';
+      whereArgs = [start, start, end];
     }
 
-    return false;
+    // Add excludeId if provided
+    if (excludeId != null) {
+      whereClause += ' AND id != ?';
+      whereArgs.add(excludeId);
+    }
+
+    final maps = await db.query(
+      tableName,
+      where: whereClause,
+      whereArgs: whereArgs,
+      limit: 1, // Only need to know if at least one overlaps
+    );
+
+    final hasOverlap = maps.isNotEmpty;
+    if (hasOverlap) {
+      final session = fromMap(maps.first);
+      developer.log(
+        'Overlap detected: new [$start, $end] overlaps with existing session ${session.id} [${session.startTime}, ${session.endTime}]',
+        name: 'SessionDatabase',
+      );
+    }
+    return hasOverlap;
   }
 }

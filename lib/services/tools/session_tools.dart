@@ -47,10 +47,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
           }
 
           if (endTime == null) {
-            final allSessions = await db.getAllSessions();
-            final activeSessions = allSessions
-                .where((s) => s.endTime == null)
-                .toList();
+            final activeSessions = await db.getSessionsByEndTimeIsNull();
 
             if (activeSessions.isNotEmpty) {
               developer.log(
@@ -131,13 +128,13 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         return await handleToolError('listing sessions', () async {
           final status = args['status'] as String?;
           developer.log('Listing sessions with status filter: $status');
-          final allSessions = await db.getAllSessions();
-
-          List<Session> filtered = allSessions;
+          List<Session> filtered;
           if (status == 'active') {
-            filtered = allSessions.where((s) => s.endTime == null).toList();
+            filtered = await db.getSessionsByEndTimeIsNull();
           } else if (status == 'completed') {
-            filtered = allSessions.where((s) => s.endTime != null).toList();
+            filtered = await db.getSessionsByEndTimeIsNotNull();
+          } else {
+            filtered = await db.getAllSessions();
           }
 
           if (filtered.isEmpty) {
@@ -220,18 +217,12 @@ List<Tool> getSessionTools(ISessionDatabase db) {
       execute: (args) async {
         return await handleToolError('getting active session', () async {
           developer.log('Getting most recent active session');
-          final allSessions = await db.getAllSessions();
-          final activeSessions = allSessions
-              .where((s) => s.endTime == null)
-              .toList();
+          final session = await db.getMostRecentActiveSession();
 
-          if (activeSessions.isEmpty) {
+          if (session == null) {
             developer.log('No active sessions found');
             return 'No active sessions found';
           }
-
-          activeSessions.sort((a, b) => b.startTime.compareTo(a.startTime));
-          final session = activeSessions.first;
 
           final result =
               'Active Session ID: ${session.id}\n  Start: ${session.startTime}\n  Notes: ${session.notes ?? 'None'}';

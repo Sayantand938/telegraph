@@ -5,6 +5,9 @@ abstract class ISessionDatabase extends IBaseDatabase<Session> {
   String get tableName;
 
   Future<List<Session>> getAllSessions();
+  Future<List<Session>> getSessionsByEndTimeIsNull();
+  Future<List<Session>> getSessionsByEndTimeIsNotNull();
+  Future<Session?> getMostRecentActiveSession();
   Future<int> createSession({
     String? notes,
     String? startTime,
