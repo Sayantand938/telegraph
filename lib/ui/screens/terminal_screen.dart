@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../../models/chat_entry.dart';
-import '../../services/ai/nim_service.dart';
+import '../../services/ai/llm_service.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});
@@ -14,7 +14,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
-  final NimService _nimService = NimService();
+  final LlmService _llmService = LlmService();
 
   // History of responses displayed in the terminal
   final List<ChatEntry> _history = [
@@ -51,7 +51,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
       // If not a built-in command, send to AI
       if (!wasHandled) {
-        final aiResponse = await _nimService.sendMessage(input);
+        final aiResponse = await _llmService.sendMessage(input);
         final response = ChatEntry(
           text: aiResponse.content,
           reasoning: aiResponse.reasoning,
@@ -121,7 +121,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
         });
         return true;
       case '/health':
-        final isHealthy = await _nimService.healthCheck();
+        final isHealthy = await _llmService.healthCheck();
         final response = ChatEntry(
           text: isHealthy
               ? '✓ AI service is online and responding'
@@ -133,7 +133,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
         });
         return true;
       case '/model':
-        final modelName = _nimService.getModelName();
+        final modelName = _llmService.getModelName();
         final response = ChatEntry(
           text: 'Current model: $modelName',
           type: ChatEntryType.system,
@@ -172,7 +172,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   @override
   void initState() {
     super.initState();
-    _nimService.initialize();
+    _llmService.initialize();
   }
 
   @override
@@ -180,7 +180,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
-    _nimService.clearHistory();
+    _llmService.clearHistory();
     super.dispose();
   }
 

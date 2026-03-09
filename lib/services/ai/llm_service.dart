@@ -11,10 +11,10 @@ class AiResponse {
   AiResponse({this.reasoning, required this.content, this.toolCalls});
 }
 
-class NimService {
-  static final NimService _instance = NimService._internal();
-  factory NimService() => _instance;
-  NimService._internal();
+class LlmService {
+  static final LlmService _instance = LlmService._internal();
+  factory LlmService() => _instance;
+  LlmService._internal();
 
   late final String _baseUrl;
   late final String _apiKey;
