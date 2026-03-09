@@ -1,24 +1,48 @@
 import 'package:sqflite/sqflite.dart' hide DatabaseException;
 import 'package:path/path.dart';
 import 'dart:io';
-import 'dart:developer' as developer;
+import 'package:logger/logger.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
 
 abstract class BaseDatabase<T> {
-  static final String _defaultLoggerName = 'BaseDatabase';
-
   final String dbName;
   final String? loggerName;
   Database? _databaseInstance;
   bool _initializationAttempted = false;
   final Database? _injectedDatabase;
+  final Logger _logger;
 
-  BaseDatabase(this.dbName, [this.loggerName]) : _injectedDatabase = null;
+  Logger get logger => _logger;
+
+  BaseDatabase(this.dbName, [this.loggerName])
+    : _injectedDatabase = null,
+      _logger = Logger(
+        filter: ProductionFilter(),
+        printer: PrettyPrinter(
+          methodCount: 0,
+          errorMethodCount: 5,
+          lineLength: 120,
+          colors: true,
+          printEmojis: false,
+          dateTimeFormat: DateTimeFormat.none,
+        ),
+      );
 
   /// Constructor for testing that allows injecting a pre-opened database.
   /// This is useful for in-memory databases where multiple instances
   /// need to share the same connection.
-  BaseDatabase.injected(this._injectedDatabase, this.dbName, [this.loggerName]);
+  BaseDatabase.injected(this._injectedDatabase, this.dbName, [this.loggerName])
+    : _logger = Logger(
+        filter: ProductionFilter(),
+        printer: PrettyPrinter(
+          methodCount: 0,
+          errorMethodCount: 5,
+          lineLength: 120,
+          colors: true,
+          printEmojis: false,
+          dateTimeFormat: DateTimeFormat.none,
+        ),
+      );
 
   // Abstract methods that subclasses must implement
   Map<String, dynamic> toMap(T model);
@@ -55,30 +79,21 @@ abstract class BaseDatabase<T> {
       final dbPath = await getDatabasesPath();
       final path = join(dbPath, dbName);
 
-      developer.log(
-        'Attempting to create database at: $path',
-        name: loggerName ?? _defaultLoggerName,
-      );
+      _logger.log(Level.info, 'Attempting to create database at: $path');
 
       final directory = Directory(dirname(path));
       if (!await directory.exists()) {
-        developer.log(
-          'Creating directory: ${directory.path}',
-          name: loggerName ?? _defaultLoggerName,
-        );
+        _logger.log(Level.info, 'Creating directory: ${directory.path}');
         await directory.create(recursive: true);
       }
 
       final db = await openDatabase(path, version: 1, onCreate: _onCreate);
-      developer.log(
-        'Database initialized successfully at: $path',
-        name: loggerName ?? _defaultLoggerName,
-      );
+      _logger.log(Level.info, 'Database initialized successfully at: $path');
       return db;
     } catch (e, stackTrace) {
-      developer.log(
+      _logger.log(
+        Level.error,
         'Error initializing database at primary location: $e',
-        name: loggerName ?? _defaultLoggerName,
         error: e,
         stackTrace: stackTrace,
       );
@@ -86,9 +101,9 @@ abstract class BaseDatabase<T> {
       try {
         final fallbackPath = join(Directory.current.path, dbName);
         final absolutePath = File(fallbackPath).absolute.path;
-        developer.log(
+        _logger.log(
+          Level.info,
           'Attempting fallback database at: $absolutePath',
-          name: loggerName ?? _defaultLoggerName,
         );
 
         final db = await openDatabase(
@@ -96,15 +111,15 @@ abstract class BaseDatabase<T> {
           version: 1,
           onCreate: _onCreate,
         );
-        developer.log(
+        _logger.log(
+          Level.info,
           'Fallback database initialized successfully at: $absolutePath',
-          name: loggerName ?? _defaultLoggerName,
         );
         return db;
       } catch (fallbackError, fallbackStack) {
-        developer.log(
+        _logger.log(
+          Level.error,
           'Fallback also failed: $fallbackError',
-          name: loggerName ?? _defaultLoggerName,
           error: fallbackError,
           stackTrace: fallbackStack,
         );

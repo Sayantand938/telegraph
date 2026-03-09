@@ -1,4 +1,4 @@
-import 'dart:developer' as developer;
+import 'package:logger/logger.dart';
 import 'package:telegraph/models/session.dart';
 import 'package:telegraph/services/repositories/i_session_repository.dart';
 import 'package:telegraph/utils/tool_helpers.dart';
@@ -7,6 +7,7 @@ import 'package:telegraph/core/errors/result.dart';
 import 'tool_definitions.dart';
 
 List<Tool> getSessionTools(ISessionRepository repository) {
+  final logger = Logger();
   return [
     Tool(
       name: 'start_session',
@@ -74,7 +75,8 @@ List<Tool> getSessionTools(ISessionRepository repository) {
           final activeSessions = activeSessionsResult.value;
 
           if (activeSessions.isNotEmpty) {
-            developer.log(
+            logger.log(
+              Level.warning,
               'Cannot start session: active session exists (ID: ${activeSessions.first.id})',
             );
             return Result.failure(
@@ -114,7 +116,10 @@ List<Tool> getSessionTools(ISessionRepository repository) {
         final hasOverlap = hasOverlapResult.value;
 
         if (hasOverlap) {
-          developer.log('Cannot start session: time overlap detected');
+          logger.log(
+            Level.warning,
+            'Cannot start session: time overlap detected',
+          );
           return Result.failure(
             BusinessLogicException(
               'Cannot start session: the specified time range overlaps with an existing session. Please choose a different time range.',
@@ -123,7 +128,8 @@ List<Tool> getSessionTools(ISessionRepository repository) {
           );
         }
 
-        developer.log(
+        logger.log(
+          Level.info,
           'Starting session with notes: $notes, start: $startTime, end: $endTime',
         );
 
@@ -135,11 +141,11 @@ List<Tool> getSessionTools(ISessionRepository repository) {
 
         return createResult.when(
           success: (id) {
-            developer.log('Session started successfully with ID: $id');
+            logger.log(Level.info, 'Session started successfully with ID: $id');
             return Result.success('Session started with ID: $id');
           },
           failure: (error) {
-            developer.log('Failed to create session: $error');
+            logger.log(Level.error, 'Failed to create session: $error');
             if (error is DatabaseException) {
               return Result.failure(
                 DatabaseException(
@@ -181,14 +187,14 @@ List<Tool> getSessionTools(ISessionRepository repository) {
       ],
       execute: (args) async {
         final notes = args['notes'] as String?;
-        developer.log('Ending active session with notes: $notes');
+        logger.log(Level.info, 'Ending active session with notes: $notes');
 
         final result = await repository.endActiveSession(notes: notes);
 
         return result.when(
           success: (endSessionResult) {
             if (endSessionResult == null) {
-              developer.log('No active session found');
+              logger.log(Level.warning, 'No active session found');
               return Result.failure(
                 NotFoundException(
                   'No active session found',
@@ -198,7 +204,8 @@ List<Tool> getSessionTools(ISessionRepository repository) {
             }
 
             if (endSessionResult.splitOccurred) {
-              developer.log(
+              logger.log(
+                Level.info,
                 'Active session ended with splitting: created ${endSessionResult.totalSessionsCreated} sessions. Final session ID: ${endSessionResult.finalSessionId}',
               );
               return Result.success(
@@ -206,13 +213,14 @@ List<Tool> getSessionTools(ISessionRepository repository) {
               );
             }
 
-            developer.log(
+            logger.log(
+              Level.info,
               'Active session ${endSessionResult.finalSessionId} ended successfully',
             );
             return Result.success('Active session ended successfully');
           },
           failure: (error) {
-            developer.log('Failed to end active session: $error');
+            logger.log(Level.error, 'Failed to end active session: $error');
             if (error is NotFoundException) {
               return Result.failure(
                 NotFoundException(
@@ -255,7 +263,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
       ],
       execute: (args) async {
         final status = args['status'] as String?;
-        developer.log('Listing sessions with status filter: $status');
+        logger.log(Level.info, 'Listing sessions with status filter: $status');
 
         Result<List<Session>> result;
 
@@ -295,7 +303,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
           }
         }
         final resultStr = buffer.toString();
-        developer.log('Found ${filtered.length} sessions');
+        logger.log(Level.info, 'Found ${filtered.length} sessions');
         return Result.success(resultStr);
       },
     ),
@@ -321,7 +329,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
         }
 
         final id = args['session_id'] as int;
-        developer.log('Getting session $id');
+        logger.log(Level.info, 'Getting session $id');
 
         final result = await repository.getSession(id);
 
@@ -347,7 +355,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
 
         final session = result.value;
         if (session == null) {
-          developer.log('Session $id not found');
+          logger.log(Level.warning, 'Session $id not found');
           return Result.failure(
             NotFoundException(
               'Session $id not found',
@@ -358,7 +366,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
 
         final resultStr =
             'Session $id:\n  Start: ${session.startTime}\n  End: ${session.endTime ?? 'N/A'}\n  Notes: ${session.notes ?? 'None'}';
-        developer.log('Session found: $resultStr');
+        logger.log(Level.info, 'Session found: $resultStr');
         return Result.success(resultStr);
       },
     ),
@@ -384,7 +392,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
         }
 
         final id = args['session_id'] as int;
-        developer.log('Deleting session $id');
+        logger.log(Level.info, 'Deleting session $id');
 
         final result = await repository.deleteSession(id);
 
@@ -410,10 +418,10 @@ List<Tool> getSessionTools(ISessionRepository repository) {
 
         final rowsAffected = result.value;
         if (rowsAffected > 0) {
-          developer.log('Session $id deleted successfully');
+          logger.log(Level.info, 'Session $id deleted successfully');
           return Result.success('Session $id deleted successfully');
         }
-        developer.log('Session $id not found');
+        logger.log(Level.warning, 'Session $id not found');
         return Result.failure(
           NotFoundException('Session $id not found', code: 'SESSION_NOT_FOUND'),
         );
@@ -425,7 +433,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
           'Get details of the most recent active session. Returns "No active sessions found" if none exist.',
       parameters: [],
       execute: (args) async {
-        developer.log('Getting most recent active session');
+        logger.log(Level.info, 'Getting most recent active session');
 
         final result = await repository.getMostRecentActiveSession();
 
@@ -450,7 +458,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
 
         final session = result.value;
         if (session == null) {
-          developer.log('No active session found');
+          logger.log(Level.warning, 'No active session found');
           return Result.failure(
             NotFoundException(
               'No active sessions found',
@@ -461,7 +469,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
 
         final resultStr =
             'Active Session ID: ${session.id}\n  Start: ${session.startTime}\n  Notes: ${session.notes ?? 'None'}';
-        developer.log('Found active session: $resultStr');
+        logger.log(Level.info, 'Found active session: $resultStr');
         return Result.success(resultStr);
       },
     ),
@@ -511,7 +519,10 @@ List<Tool> getSessionTools(ISessionRepository repository) {
         final notes = args['notes'] as String;
         final append = args['append'] as bool? ?? true;
 
-        developer.log('Updating notes for session $id (append: $append)');
+        logger.log(
+          Level.info,
+          'Updating notes for session $id (append: $append)',
+        );
 
         final getResult = await repository.getSession(id);
 
@@ -537,7 +548,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
 
         final session = getResult.value;
         if (session == null) {
-          developer.log('Session $id not found');
+          logger.log(Level.warning, 'Session $id not found');
           return Result.failure(
             NotFoundException(
               'Session $id not found',
@@ -559,12 +570,12 @@ List<Tool> getSessionTools(ISessionRepository repository) {
         return updateResult.when(
           success: (rowsAffected) {
             if (rowsAffected > 0) {
-              developer.log('Session $id notes updated successfully');
+              logger.log(Level.info, 'Session $id notes updated successfully');
               return Result.success(
                 'Session $id notes updated successfully.\nCurrent notes:\n$finalNotes',
               );
             }
-            developer.log('Failed to update session $id');
+            logger.log(Level.warning, 'Failed to update session $id');
             return Result.failure(
               DatabaseException(
                 'Failed to update session $id',
@@ -573,7 +584,7 @@ List<Tool> getSessionTools(ISessionRepository repository) {
             );
           },
           failure: (error) {
-            developer.log('Failed to update session $id: $error');
+            logger.log(Level.error, 'Failed to update session $id: $error');
             return Result.failure(
               DatabaseException(
                 'Failed to update session $id: ${error.message}',

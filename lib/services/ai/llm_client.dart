@@ -105,6 +105,7 @@ class LlmToolCall {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'type': 'function',
       'function': {'name': name, 'arguments': jsonEncode(arguments)},
     };
   }

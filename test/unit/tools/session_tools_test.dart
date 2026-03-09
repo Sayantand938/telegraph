@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:telegraph/services/tools/session_tools.dart';
 import 'package:telegraph/services/tools/tool_definitions.dart';
-import 'package:telegraph/services/repositories/i_session_repository.dart';
 import 'package:telegraph/models/session.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
 import 'package:telegraph/core/errors/result.dart';

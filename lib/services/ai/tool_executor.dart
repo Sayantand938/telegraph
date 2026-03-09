@@ -1,6 +1,6 @@
 import 'llm_client.dart';
 import 'package:telegraph/services/tools/tool_service.dart';
-import 'dart:developer' as developer;
+import 'package:logger/logger.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
 import 'package:telegraph/core/errors/result.dart';
 
@@ -30,8 +30,9 @@ class ToolExecutionResult {
 /// Orchestrates tool execution based on LLM tool calls
 class ToolExecutor {
   final ToolService _toolService;
+  final Logger _logger;
 
-  ToolExecutor(this._toolService);
+  ToolExecutor(this._toolService) : _logger = Logger();
 
   /// Execute a list of tool calls and return the results
   /// Tools are executed sequentially (for now - could be parallelized if independent)
@@ -53,7 +54,8 @@ class ToolExecutor {
     final stopwatch = Stopwatch()..start();
 
     try {
-      developer.log(
+      _logger.log(
+        Level.info,
         'Executing tool: ${toolCall.name} with args: ${toolCall.arguments}',
       );
 
@@ -64,7 +66,8 @@ class ToolExecutor {
 
       stopwatch.stop();
 
-      developer.log(
+      _logger.log(
+        Level.info,
         'Tool ${toolCall.name} executed successfully in ${stopwatch.elapsedMilliseconds}ms',
       );
 
@@ -76,7 +79,12 @@ class ToolExecutor {
     } catch (e, stackTrace) {
       stopwatch.stop();
 
-      developer.log('Tool ${toolCall.name} failed: $e', stackTrace: stackTrace);
+      _logger.log(
+        Level.error,
+        'Tool ${toolCall.name} failed: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
 
       // Wrap the exception in a ToolException if it's not already one
       final exception = e is AppException

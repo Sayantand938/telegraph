@@ -2,10 +2,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:telegraph/models/chat_entry.dart';
 import 'package:telegraph/services/ai/llm_service_new.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:logger/logger.dart';
 
 // Riverpod v3 provider using Notifier (no code generation required)
 
 class TerminalNotifier extends Notifier<List<ChatEntry>> {
+  final Logger _logger = Logger();
+
   @override
   List<ChatEntry> build() => _initialState;
 
@@ -29,13 +32,17 @@ class TerminalNotifier extends Notifier<List<ChatEntry>> {
     final command = input.trim().toLowerCase();
     if (command.isEmpty) return;
 
+    _logger.i('Handling command: $input');
+
     // Add user message
     state = [...state, ChatEntry(text: '> $input', type: ChatEntryType.user)];
 
     try {
       final wasHandled = _processCommand(command, input, llmService);
       if (!wasHandled) {
+        _logger.d('Sending to AI service...');
         final response = await llmService.sendMessage(input);
+        _logger.d('Received response from AI service');
         state = [
           ...state,
           ChatEntry(
@@ -48,7 +55,8 @@ class TerminalNotifier extends Notifier<List<ChatEntry>> {
           state = [...state, ChatEntry(text: '', type: ChatEntryType.blank)];
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      _logger.e('Error in handleCommand', error: e, stackTrace: stackTrace);
       final errorMsg = e is AppException
           ? _formatException(e)
           : 'Unexpected error: $e';

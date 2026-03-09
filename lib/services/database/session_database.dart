@@ -1,5 +1,5 @@
 import 'package:sqflite/sqflite.dart';
-import 'dart:developer' as developer;
+import 'package:logger/logger.dart';
 import 'package:telegraph/models/session.dart';
 import 'base_database.dart';
 import 'i_session_database.dart';
@@ -231,9 +231,9 @@ class SessionDatabase extends BaseDatabase<Session>
     final hasOverlap = maps.isNotEmpty;
     if (hasOverlap) {
       final session = fromMap(maps.first);
-      developer.log(
+      logger.log(
+        Level.warning,
         'Overlap detected: new [$start, $end] overlaps with existing session ${session.id} [${session.startTime}, ${session.endTime}]',
-        name: 'SessionDatabase',
       );
     }
     return hasOverlap;

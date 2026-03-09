@@ -1,4 +1,4 @@
-import 'dart:developer' as developer;
+import 'package:logger/logger.dart';
 import 'package:telegraph/models/finance_transaction.dart';
 import 'package:telegraph/services/repositories/i_finance_repository.dart';
 import 'package:telegraph/utils/tool_helpers.dart';
@@ -7,6 +7,7 @@ import 'package:telegraph/core/errors/result.dart';
 import 'tool_definitions.dart';
 
 List<Tool> getFinanceTools(IFinanceRepository repository) {
+  final logger = Logger();
   return [
     Tool(
       name: 'add_transaction',
@@ -83,7 +84,8 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
           );
         }
 
-        developer.log(
+        logger.log(
+          Level.info,
           'Adding transaction: type=$type, amount=$amount, timestamp=$timestamp, note=$note',
         );
 
@@ -97,14 +99,17 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
         final result = await repository.createTransaction(transaction);
         return result.when(
           success: (id) {
-            developer.log('Transaction added successfully with ID: $id');
+            logger.log(
+              Level.info,
+              'Transaction added successfully with ID: $id',
+            );
             final typeLabel = transactionTypeLabel(type);
             final message =
                 '$typeLabel transaction recorded (ID: $id)\n  Amount: \$${amount.toStringAsFixed(2)}\n  Time: $timestamp${note != null ? '\n  Note: $note' : ''}';
             return Result.success(message);
           },
           failure: (error) {
-            developer.log('Failed to create transaction: $error');
+            logger.log(Level.error, 'Failed to create transaction: $error');
             return Result.failure(
               DatabaseException(
                 error.message,
@@ -222,7 +227,7 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
         );
 
         final resultStr = buffer.toString();
-        developer.log('Listed ${transactions.length} transactions');
+        logger.log(Level.info, 'Listed ${transactions.length} transactions');
         return Result.success(resultStr);
       },
     ),
@@ -248,7 +253,7 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
         }
 
         final id = args['transaction_id'] as int;
-        developer.log('Getting transaction $id');
+        logger.log(Level.info, 'Getting transaction $id');
 
         final result = await repository.getTransaction(id);
 
@@ -274,7 +279,7 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
 
         final tx = result.value;
         if (tx == null) {
-          developer.log('Transaction $id not found');
+          logger.log(Level.warning, 'Transaction $id not found');
           return Result.failure(
             NotFoundException(
               'Transaction $id not found',
@@ -286,7 +291,7 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
         final typeLabel = transactionTypeLabel(tx.type);
         final resultStr =
             'Transaction $id:\n  Type: $typeLabel\n  Amount: \$${tx.amount.toStringAsFixed(2)}\n  Time: ${tx.transactionTime}\n  Note: ${tx.note ?? 'None'}';
-        developer.log('Transaction found: $resultStr');
+        logger.log(Level.info, 'Transaction found: $resultStr');
         return Result.success(resultStr);
       },
     ),
@@ -312,7 +317,7 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
         }
 
         final id = args['transaction_id'] as int;
-        developer.log('Deleting transaction $id');
+        logger.log(Level.info, 'Deleting transaction $id');
 
         final result = await repository.deleteTransaction(id);
 
@@ -338,10 +343,10 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
 
         final rowsAffected = result.value;
         if (rowsAffected > 0) {
-          developer.log('Transaction $id deleted successfully');
+          logger.log(Level.info, 'Transaction $id deleted successfully');
           return Result.success('Transaction $id deleted successfully');
         }
-        developer.log('Transaction $id not found');
+        logger.log(Level.warning, 'Transaction $id not found');
         return Result.failure(
           NotFoundException(
             'Transaction $id not found',
@@ -396,7 +401,7 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
         }
 
         final id = args['transaction_id'] as int;
-        developer.log('Updating transaction $id');
+        logger.log(Level.info, 'Updating transaction $id');
 
         final getResult = await repository.getTransaction(id);
 
@@ -422,7 +427,7 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
 
         final existing = getResult.value;
         if (existing == null) {
-          developer.log('Transaction $id not found');
+          logger.log(Level.warning, 'Transaction $id not found');
           return Result.failure(
             NotFoundException(
               'Transaction $id not found',
@@ -481,10 +486,10 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
         return updateResult.when(
           success: (rowsAffected) {
             if (rowsAffected > 0) {
-              developer.log('Transaction $id updated successfully');
+              logger.log(Level.info, 'Transaction $id updated successfully');
               return Result.success('Transaction $id updated successfully');
             }
-            developer.log('Failed to update transaction $id');
+            logger.log(Level.warning, 'Failed to update transaction $id');
             return Result.failure(
               DatabaseException(
                 'Failed to update transaction $id',
@@ -493,7 +498,7 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
             );
           },
           failure: (error) {
-            developer.log('Failed to update transaction $id: $error');
+            logger.log(Level.error, 'Failed to update transaction $id: $error');
             return Result.failure(
               DatabaseException(
                 'Failed to update transaction $id: ${error.message}',
@@ -604,7 +609,10 @@ List<Tool> getFinanceTools(IFinanceRepository repository) {
         );
 
         final resultStr = buffer.toString();
-        developer.log('Generated financial summary for period: $period');
+        logger.log(
+          Level.info,
+          'Generated financial summary for period: $period',
+        );
         return Result.success(resultStr);
       },
     ),

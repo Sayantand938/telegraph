@@ -6,10 +6,14 @@ import 'package:telegraph/core/config/app_config.dart';
 import 'package:telegraph/core/config/platform_config.dart';
 import 'package:telegraph/configure_dependencies.dart';
 import 'package:telegraph/ui/app.dart';
+import 'package:logger/logger.dart';
 
 Future<void> main() async {
   // Ensure Flutter bindings are initialized first
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Configure logger to output to console
+  Logger.level = Level.verbose;
 
   // Detect platform-specific settings
   final platformConfig = _detectPlatformConfig();

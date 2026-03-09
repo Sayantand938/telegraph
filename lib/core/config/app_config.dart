@@ -60,7 +60,7 @@ class AppConfig {
           'telegraph_finance.db',
         ),
         sessionDbName: _getEnvVariable('SESSION_DB_NAME', 'telegraph.db'),
-        customDbPath: _getEnvVariable('CUSTOM_DB_PATH', null),
+        customDbPath: _getEnvVariable('CUSTOM_DB_PATH', ''),
       ),
       platform: platformConfig,
       enableLogging:

@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:telegraph/models/chat_entry.dart';
 import 'package:telegraph/services/ai/llm_service_new.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:logger/logger.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});
@@ -17,6 +18,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
   late final LlmServiceNew _llmService;
+  final Logger _logger = Logger();
 
   // History of responses displayed in the terminal
   final List<ChatEntry> _history = [
@@ -41,6 +43,8 @@ class _TerminalScreenState extends State<TerminalScreen> {
     final command = input.trim().toLowerCase();
     if (command.isEmpty) return;
 
+    _logger.i('Handling command: $input');
+
     setState(() {
       // Add the user's command to history
       _history.add(ChatEntry(text: '> $input', type: ChatEntryType.user));
@@ -53,7 +57,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
       // If not a built-in command, send to AI
       if (!wasHandled) {
+        _logger.d('Sending to AI service...');
         final aiResponse = await _llmService.sendMessage(input);
+        _logger.d('Received response from AI service');
         final response = ChatEntry(
           text: aiResponse.content,
           reasoning: aiResponse.reasoning,
@@ -74,6 +80,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       }
     } on AppException catch (e) {
       // Handle our custom exceptions with user-friendly messages
+      _logger.e('AppException caught', error: e);
       setState(() {
         _history.add(
           ChatEntry(text: _formatAppException(e), type: ChatEntryType.error),
@@ -81,8 +88,13 @@ class _TerminalScreenState extends State<TerminalScreen> {
         _history.add(ChatEntry(text: '', type: ChatEntryType.blank));
         _isProcessing = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Handle any other unexpected errors
+      _logger.e(
+        'Unexpected error in _handleCommand',
+        error: e,
+        stackTrace: stackTrace,
+      );
       setState(() {
         _history.add(
           ChatEntry(text: 'Unexpected error: $e', type: ChatEntryType.error),

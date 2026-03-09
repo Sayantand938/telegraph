@@ -4,6 +4,7 @@ import 'conversation_manager.dart';
 import 'tool_executor.dart';
 import 'package:telegraph/services/tools/tool_service.dart';
 import 'package:telegraph/core/errors/exceptions.dart';
+import 'package:logger/logger.dart';
 
 /// Main service for interacting with the LLM
 /// This is a facade that coordinates the specialized components
@@ -12,6 +13,7 @@ class LlmServiceNew {
   final ConversationManager _conversationManager;
   final ToolExecutor _toolExecutor;
   final ToolService _toolService;
+  final Logger _logger;
 
   bool _initialized = false;
   String? _modelName;
@@ -24,7 +26,8 @@ class LlmServiceNew {
   }) : _client = client,
        _conversationManager = conversationManager,
        _toolExecutor = toolExecutor,
-       _toolService = toolService;
+       _toolService = toolService,
+       _logger = Logger();
 
   /// Initialize the service (load config if needed)
   Future<void> initialize() async {
@@ -63,14 +66,22 @@ class LlmServiceNew {
     }
 
     try {
+      _logger.i(
+        'Sending message to LLM: ${message.substring(0, message.length > 50 ? 50 : message.length)}${message.length > 50 ? '...' : ''}',
+      );
+
       // Add user message to history
       _conversationManager.addUserMessage(message);
 
       // Get conversation context
       final history = _conversationManager.prepareContext();
+      _logger.d('Conversation history length: ${history.length} messages');
 
       // Get tool schemas
       final toolSchemas = _toolService.getToolSchemas();
+      _logger.d(
+        'Available tools: ${toolSchemas.map((s) => s['function']['name']).toList()}',
+      );
       final tools = toolSchemas
           .map(
             (schema) => LlmToolSchema(
@@ -89,8 +100,15 @@ class LlmServiceNew {
         stream: stream,
       );
 
+      _logger.d(
+        'Request built: model=${_client.modelName}, tools=${tools.length}, stream=$stream',
+      );
+
       // Send to LLM
       final response = await _client.sendMessage(request);
+      _logger.i(
+        'Received response from LLM: content length=${response.content.length}, hasReasoning=${response.reasoning != null}, toolCalls=${response.toolCalls?.length ?? 0}',
+      );
 
       // If there are tool calls, execute them and get final response
       if (response.toolCalls != null && response.toolCalls!.isNotEmpty) {
@@ -121,9 +139,14 @@ class LlmServiceNew {
         reasoning: response.reasoning,
         toolCalls: toolCallsMaps,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      _logger.e(
+        'Failed to send message to LLM',
+        error: e,
+        stackTrace: stackTrace,
+      );
       throw AiServiceException(
-        'Failed to send message',
+        'Failed to send message: ${e.toString()}',
         originalError: e,
         code: 'LLM_REQUEST_FAILED',
       );
