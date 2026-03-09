@@ -3,24 +3,24 @@
 ## Phase 1: Foundation (Week 1-2)
 **Goal:** Establish testing infrastructure and patterns
 
-- Set up test dependencies (mockito/mocktail, test, flutter_test)
-- Create test directory structure:
+- [x] Set up test dependencies (mockito/mocktail, test, flutter_test)
+- [ ] Create test directory structure:
   - `test/unit/` for pure unit tests
   - `test/integration/` for database tests
   - `test/fixtures/` for test data
-- Define testing conventions and documentation
-- Add CI/CD pipeline configuration for running tests
+- [ ] Define testing conventions and documentation
+- [ ] Add CI/CD pipeline configuration for running tests
 
 ## Phase 2: Refactor Core Services (Week 3-4)
 **Goal:** Enable dependency injection and mocking
 
-- Create abstract interfaces for all database classes:
+- [x] Create abstract interfaces for all database classes:
   - `ISessionDatabase`
   - `IFinanceDatabase`
   - `IBaseDatabase<T>`
-- Refactor `ToolService` to accept dependencies via constructor
-- Update singleton implementations to support instance injection
-- Add factory pattern for test vs production instances
+- [x] Refactor `ToolService` to accept dependencies via constructor
+- [x] Update singleton implementations to support instance injection
+- [ ] Add factory pattern for test vs production instances
 
 ## Phase 3: Database Layer Testing (Week 5-6)
 **Goal:** Comprehensive database test coverage

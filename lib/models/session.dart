@@ -37,4 +37,18 @@ class Session {
       notes: notes ?? this.notes,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Session &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          startTime == other.startTime &&
+          endTime == other.endTime &&
+          notes == other.notes;
+
+  @override
+  int get hashCode =>
+      id.hashCode ^ startTime.hashCode ^ endTime.hashCode ^ notes.hashCode;
 }

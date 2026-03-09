@@ -53,4 +53,23 @@ class FinanceTransaction {
       note: note ?? this.note,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FinanceTransaction &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          type == other.type &&
+          amount == other.amount &&
+          transactionTime == other.transactionTime &&
+          note == other.note;
+
+  @override
+  int get hashCode =>
+      id.hashCode ^
+      type.hashCode ^
+      amount.hashCode ^
+      transactionTime.hashCode ^
+      note.hashCode;
 }
