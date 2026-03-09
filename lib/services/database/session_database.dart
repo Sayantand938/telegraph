@@ -218,44 +218,50 @@ class SessionDatabase {
         splitOccurred: false,
       );
     } else {
-      // Multi-day: split into daily sessions
-      await deleteSession(id);
-
+      // Multi-day: split into daily sessions using transaction
+      int? lastInsertedId;
       int count = 0;
-      int lastInsertedId = 0;
-      DateTime currentStart = start;
+      final db = await database;
 
-      while (currentStart.isBefore(now)) {
-        count++;
-        DateTime nextMidnight = DateTime(
-          currentStart.year,
-          currentStart.month,
-          currentStart.day + 1,
-        );
-        DateTime segmentEnd = nextMidnight.isBefore(now) ? nextMidnight : now;
+      await db.transaction((txn) async {
+        // Delete original session within transaction
+        await txn.delete('sessions', where: 'id = ?', whereArgs: [id]);
 
-        String? segmentNotes;
-        if (count == 1) {
-          segmentNotes = session.notes;
-        } else if (segmentEnd == now) {
-          segmentNotes = notes;
-        } else {
-          segmentNotes = "Split from session $id";
+        DateTime currentStart = start;
+
+        while (currentStart.isBefore(now)) {
+          count++;
+          DateTime nextMidnight = DateTime(
+            currentStart.year,
+            currentStart.month,
+            currentStart.day + 1,
+          );
+          DateTime segmentEnd = nextMidnight.isBefore(now) ? nextMidnight : now;
+
+          String? segmentNotes;
+          if (count == 1) {
+            segmentNotes = session.notes;
+          } else if (segmentEnd == now) {
+            segmentNotes = notes;
+          } else {
+            segmentNotes = "Split from session $id";
+          }
+
+          lastInsertedId = await txn.insert('sessions', {
+            'start_time': currentStart.toIso8601String(),
+            'end_time': segmentEnd.toIso8601String(),
+            'notes': segmentNotes,
+          });
+
+          if (segmentEnd == now) break;
+          currentStart = segmentEnd;
         }
-
-        lastInsertedId = await createSession(
-          startTime: currentStart.toIso8601String(),
-          endTime: segmentEnd.toIso8601String(),
-          notes: segmentNotes,
-        );
-
-        if (segmentEnd == now) break;
-        currentStart = segmentEnd;
-      }
+        // Transaction auto-commits if no exception
+      });
 
       return EndSessionResult(
         originalSessionId: id,
-        finalSessionId: lastInsertedId,
+        finalSessionId: lastInsertedId!,
         totalSessionsCreated: count,
         splitOccurred: true,
       );
