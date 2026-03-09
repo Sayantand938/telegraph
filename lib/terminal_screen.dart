@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import '../services/nim_service.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});
@@ -11,58 +13,118 @@ class _TerminalScreenState extends State<TerminalScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
+  final NimService _nimService = NimService();
 
-  // History of lines displayed in the terminal
-  final List<String> _history = [
-    'Flutter Terminal UI [Version 1.0.0]',
-    'Type "help" to see available commands.',
-    '',
+  // History of responses displayed in the terminal
+  final List<ChatEntry> _history = [
+    ChatEntry(
+      text: 'Flutter Terminal AI [Version 1.0.0]',
+      type: ChatEntryType.system,
+    ),
+    ChatEntry(
+      text: 'Type "help" to see available commands.',
+      type: ChatEntryType.system,
+    ),
+    ChatEntry(
+      text: 'Chat with AI by typing any message.',
+      type: ChatEntryType.system,
+    ),
+    ChatEntry(text: '', type: ChatEntryType.blank),
   ];
 
-  void _handleCommand(String input) {
+  bool _isProcessing = false;
+
+  Future<void> _handleCommand(String input) async {
     final command = input.trim().toLowerCase();
     if (command.isEmpty) return;
 
     setState(() {
       // Add the user's command to history
-      _history.add('> $input');
-
-      // Basic Command Logic
-      switch (command) {
-        case 'help':
-          _history.add('Available commands:');
-          _history.add('  help  - Show this message');
-          _history.add('  clear - Clear the screen');
-          _history.add('  echo  - Repeat text (e.g., echo hello)');
-          _history.add('  date  - Show current date/time');
-          _history.add('  exit  - "Close" terminal');
-          break;
-        case 'clear':
-          _history.clear();
-          break;
-        case 'date':
-          _history.add(DateTime.now().toString());
-          break;
-        case 'exit':
-          _history.add('System: Exit command received. Goodbye.');
-          break;
-        default:
-          if (command.startsWith('echo ')) {
-            _history.add(input.substring(5));
-          } else {
-            _history.add('Error: Command "$command" not found.');
-          }
-      }
-      _history.add(''); // Add a blank line for spacing
+      _history.add(ChatEntry(text: '> $input', type: ChatEntryType.user));
+      _isProcessing = true;
     });
+
+    try {
+      // Check if it's a built-in command
+      ChatEntry? response = await _processCommand(command, input);
+
+      // If not a built-in command, send to AI
+      if (response == null) {
+        final aiResponse = await _nimService.sendMessage(input);
+        response = ChatEntry(
+          text: aiResponse.content,
+          reasoning: aiResponse.reasoning,
+          type: ChatEntryType.ai,
+        );
+      }
+
+      setState(() {
+        if (response != null) {
+          _history.add(response);
+        }
+        if (response != null && response.text.isNotEmpty) {
+          _history.add(ChatEntry(text: '', type: ChatEntryType.blank));
+        }
+        _isProcessing = false;
+      });
+    } catch (e) {
+      setState(() {
+        _history.add(ChatEntry(
+          text: 'Error: $e',
+          type: ChatEntryType.error,
+        ));
+        _history.add(ChatEntry(text: '', type: ChatEntryType.blank));
+        _isProcessing = false;
+      });
+    }
 
     _controller.clear();
     _scrollToBottom();
-    _focusNode.requestFocus(); // Keep the keyboard open
+    _focusNode.requestFocus();
+  }
+
+  Future<ChatEntry?> _processCommand(String command, String fullInput) async {
+    switch (command) {
+      case 'help':
+        return ChatEntry(
+          text: '''Available commands:
+  help  - Show this message
+  clear - Clear the screen
+  echo  - Repeat text (e.g., echo hello)
+  date  - Show current date/time
+  exit  - "Close" terminal''',
+          type: ChatEntryType.system,
+        );
+      case 'clear':
+        setState(() {
+          _history.clear();
+        });
+        return null;
+      case 'date':
+        return ChatEntry(
+          text: DateTime.now().toString(),
+          type: ChatEntryType.system,
+        );
+      case 'exit':
+        setState(() {
+          _history.add(ChatEntry(
+            text: 'System: Exit command received. Goodbye.',
+            type: ChatEntryType.system,
+          ));
+        });
+        return null;
+      default:
+        if (command.startsWith('echo ')) {
+          return ChatEntry(
+            text: fullInput.substring(5),
+            type: ChatEntryType.system,
+          );
+        }
+        return null;
+    }
   }
 
   void _scrollToBottom() {
-    // Small delay to ensure the frame is rendered before scrolling
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -75,8 +137,23 @@ class _TerminalScreenState extends State<TerminalScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _nimService.initialize();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -89,12 +166,57 @@ class _TerminalScreenState extends State<TerminalScreen> {
                   controller: _scrollController,
                   itemCount: _history.length,
                   itemBuilder: (context, index) {
-                    final text = _history[index];
-                    final isError = text.startsWith('Error:');
+                    final entry = _history[index];
+                    if (entry.type == ChatEntryType.blank) {
+                      return const SizedBox(height: 8);
+                    }
+
+                    if (entry.reasoning != null) {
+                      return _buildAiResponseWithReasoning(entry);
+                    }
+
+                    // Render markdown for AI responses
+                    if (entry.type == ChatEntryType.ai) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8.0),
+                        child: MarkdownBody(
+                          data: entry.text,
+                          styleSheet: MarkdownStyleSheet(
+                            p: const TextStyle(
+                              color: Colors.cyanAccent,
+                              fontSize: 16,
+                              fontFamily: 'JetBrainsMono',
+                            ),
+                            code: const TextStyle(
+                              color: Colors.yellow,
+                              fontSize: 14,
+                              fontFamily: 'JetBrainsMono',
+                              backgroundColor: Color(0xFF222222),
+                            ),
+                            codeblockDecoration: BoxDecoration(
+                              color: Colors.grey[900],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            blockquote: const TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                              fontFamily: 'JetBrainsMono',
+                              fontStyle: FontStyle.italic,
+                            ),
+                            listBullet: const TextStyle(
+                              color: Colors.cyanAccent,
+                              fontSize: 16,
+                              fontFamily: 'JetBrainsMono',
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
                     return Text(
-                      text,
+                      entry.text,
                       style: TextStyle(
-                        color: isError ? Colors.red : Colors.white,
+                        color: _getTextColor(entry.type),
                         fontSize: 16,
                         fontFamily: 'JetBrainsMono',
                       ),
@@ -102,6 +224,21 @@ class _TerminalScreenState extends State<TerminalScreen> {
                   },
                 ),
               ),
+
+              // Loading indicator
+              if (_isProcessing)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'AI is thinking...',
+                    style: TextStyle(
+                      color: Colors.yellow,
+                      fontSize: 14,
+                      fontFamily: 'JetBrainsMono',
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
 
               // Input Area
               Container(
@@ -115,7 +252,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
                     const Text(
                       '> ',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: Colors.greenAccent,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -137,8 +274,18 @@ class _TerminalScreenState extends State<TerminalScreen> {
                           contentPadding: EdgeInsets.symmetric(vertical: 8),
                         ),
                         onSubmitted: _handleCommand,
+                        enabled: !_isProcessing,
                       ),
                     ),
+                    if (_isProcessing)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.greenAccent),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -147,5 +294,162 @@ class _TerminalScreenState extends State<TerminalScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildAiResponseWithReasoning(ChatEntry entry) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Collapsible reasoning section
+        _buildCollapsibleReasoning(entry),
+        const SizedBox(height: 8),
+        // AI response content with markdown
+        Container(
+          margin: const EdgeInsets.only(bottom: 8.0),
+          child: MarkdownBody(
+            data: entry.text,
+            styleSheet: MarkdownStyleSheet(
+              p: const TextStyle(
+                color: Colors.cyanAccent,
+                fontSize: 16,
+                fontFamily: 'JetBrainsMono',
+              ),
+              code: const TextStyle(
+                color: Colors.yellow,
+                fontSize: 14,
+                fontFamily: 'JetBrainsMono',
+                backgroundColor: Color(0xFF222222),
+              ),
+              codeblockDecoration: BoxDecoration(
+                color: Colors.grey[900],
+                borderRadius: BorderRadius.circular(4),
+              ),
+              blockquote: const TextStyle(
+                color: Colors.grey,
+                fontSize: 14,
+                fontFamily: 'JetBrainsMono',
+                fontStyle: FontStyle.italic,
+              ),
+              listBullet: const TextStyle(
+                color: Colors.cyanAccent,
+                fontSize: 16,
+                fontFamily: 'JetBrainsMono',
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCollapsibleReasoning(ChatEntry entry) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8.0),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          InkWell(
+            onTap: () {
+              setState(() {
+                entry.toggleReasoning();
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    entry.isReasoningExpanded
+                        ? Icons.arrow_drop_up
+                        : Icons.arrow_drop_down,
+                    color: Colors.yellow,
+                    size: 20,
+                  ),
+                  const Text(
+                    'Thinking',
+                    style: TextStyle(
+                      color: Colors.yellow,
+                      fontSize: 14,
+                      fontFamily: 'JetBrainsMono',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Reasoning content with markdown
+          if (entry.isReasoningExpanded)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 8.0,
+              ),
+              child: MarkdownBody(
+                data: entry.reasoning!,
+                styleSheet: MarkdownStyleSheet(
+                  p: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 14,
+                    fontFamily: 'JetBrainsMono',
+                    fontStyle: FontStyle.italic,
+                  ),
+                  code: const TextStyle(
+                    color: Colors.yellow,
+                    fontSize: 12,
+                    fontFamily: 'JetBrainsMono',
+                    backgroundColor: Color(0xFF222222),
+                  ),
+                  codeblockDecoration: BoxDecoration(
+                    color: Colors.grey[850],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Color _getTextColor(ChatEntryType type) {
+    switch (type) {
+      case ChatEntryType.user:
+        return Colors.greenAccent;
+      case ChatEntryType.ai:
+        return Colors.cyanAccent;
+      case ChatEntryType.error:
+        return Colors.red;
+      case ChatEntryType.system:
+        return Colors.grey;
+      case ChatEntryType.blank:
+        return Colors.transparent;
+    }
+  }
+}
+
+enum ChatEntryType { user, ai, error, system, blank }
+
+class ChatEntry {
+  final String text;
+  final String? reasoning;
+  final ChatEntryType type;
+  bool isReasoningExpanded;
+
+  ChatEntry({
+    required this.text,
+    this.reasoning,
+    required this.type,
+    this.isReasoningExpanded = false,
+  });
+
+  void toggleReasoning() {
+    isReasoningExpanded = !isReasoningExpanded;
   }
 }
