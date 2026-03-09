@@ -194,25 +194,32 @@ class SessionDatabase extends BaseDatabase<Session>
 
   @override
   Future<bool> hasOverlap(String start, String? end, {int? excludeId}) async {
+    final newStart = DateTime.parse(start);
     final newEnd = end != null ? DateTime.parse(end) : null;
     final db = await database;
 
     // Build WHERE clause based on overlap logic
+    // Two time intervals [a,b] and [c,d] overlap if a < d AND b > c
+    // For our case:
+    // - Existing session: [existing.start_time, existing.end_time]
+    // - New session: [newStart, newEnd]
     // Overlap occurs when:
-    // - existing session is active (end_time IS NULL) and newStart >= existing.start_time
-    // - OR existing session has end_time and newStart < existing.end_time AND newEnd > existing.start_time
+    // existing.start_time < newEnd AND (existing.end_time IS NULL OR existing.end_time > newStart)
     String whereClause;
     List<dynamic> whereArgs;
 
     if (newEnd == null) {
-      // New session is active: overlaps with any active session that started at or before newStart
-      whereClause = 'end_time IS NULL AND start_time <= ?';
-      whereArgs = [start];
+      // New session is active (ongoing):
+      // Overlaps with existing session if existing.start_time <= newStart
+      // (because either existing is active or existing ends after newStart)
+      whereClause = 'start_time <= ? AND (end_time IS NULL OR end_time > ?)';
+      whereArgs = [start, start];
     } else {
-      // New session has end time: overlaps with active sessions or sessions that overlap in time
-      whereClause =
-          '(end_time IS NULL AND start_time <= ?) OR (end_time IS NOT NULL AND ? < end_time AND ? > start_time)';
-      whereArgs = [start, start, end];
+      // New session has definite end time:
+      // Overlaps with existing session if existing.start_time < newEnd
+      // AND (existing is active OR existing.end_time > newStart)
+      whereClause = 'start_time < ? AND (end_time IS NULL OR end_time > ?)';
+      whereArgs = [end, start];
     }
 
     // Add excludeId if provided
