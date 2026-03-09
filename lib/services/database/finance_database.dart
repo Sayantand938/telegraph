@@ -35,20 +35,25 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction>
     ''');
   }
 
-  // Wrapper methods for backward compatibility
+  // Wrapper methods required by IFinanceDatabase
   @override
   Future<int> createTransaction(FinanceTransaction transaction) async =>
       create(transaction);
+
   @override
   Future<FinanceTransaction?> getTransaction(int id) async => get(id);
+
   @override
   Future<List<FinanceTransaction>> getAllTransactions() async => getAll();
+
   @override
   Future<int> updateTransaction(FinanceTransaction transaction) async =>
       update(transaction);
+
   @override
   Future<int> deleteTransaction(int id) async => delete(id);
 
+  // Additional query methods
   @override
   Future<List<FinanceTransaction>> getTransactionsByType(
     TransactionType type,

@@ -1,6 +1,7 @@
 import 'dart:developer' as developer;
 import 'package:telegraph/models/session.dart';
 import 'package:telegraph/services/database/i_session_database.dart';
+import 'package:telegraph/utils/tool_helpers.dart';
 import 'tool_definitions.dart';
 
 List<Tool> getSessionTools(ISessionDatabase db) {
@@ -31,24 +32,18 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('starting session', () async {
           final notes = args['notes'] as String?;
           String? startTime = args['start_time'] as String?;
           String? endTime = args['end_time'] as String?;
 
           startTime ??= DateTime.now().toIso8601String();
 
-          try {
-            DateTime.parse(startTime);
-          } catch (e) {
+          if (!isValidIso8601(startTime)) {
             return 'Invalid start_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
           }
-          if (endTime != null) {
-            try {
-              DateTime.parse(endTime);
-            } catch (e) {
-              return 'Invalid end_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
-            }
+          if (endTime != null && !isValidIso8601(endTime)) {
+            return 'Invalid end_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
           }
 
           if (endTime == null) {
@@ -81,10 +76,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
           );
           developer.log('Session started successfully with ID: $id');
           return 'Session started with ID: $id';
-        } catch (e, stackTrace) {
-          developer.log('Error starting session: $e', stackTrace: stackTrace);
-          return 'Error starting session: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -99,7 +91,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('ending session', () async {
           final notes = args['notes'] as String?;
           developer.log('Ending active session with notes: $notes');
           final result = await db.endActiveSession(notes: notes);
@@ -120,10 +112,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
             'Active session ${result.finalSessionId} ended successfully',
           );
           return 'Active session ended successfully';
-        } catch (e, stackTrace) {
-          developer.log('Error ending session: $e', stackTrace: stackTrace);
-          return 'Error ending session: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -139,7 +128,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('listing sessions', () async {
           final status = args['status'] as String?;
           developer.log('Listing sessions with status filter: $status');
           final allSessions = await db.getAllSessions();
@@ -168,10 +157,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
           final result = buffer.toString();
           developer.log('Found ${filtered.length} sessions');
           return result;
-        } catch (e, stackTrace) {
-          developer.log('Error listing sessions: $e', stackTrace: stackTrace);
-          return 'Error listing sessions: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -186,7 +172,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('getting session', () async {
           final id = args['session_id'] as int;
           developer.log('Getting session $id');
           final session = await db.getSession(id);
@@ -198,10 +184,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
               'Session $id:\n  Start: ${session.startTime}\n  End: ${session.endTime ?? 'N/A'}\n  Notes: ${session.notes ?? 'None'}';
           developer.log('Session found: $result');
           return result;
-        } catch (e, stackTrace) {
-          developer.log('Error getting session: $e', stackTrace: stackTrace);
-          return 'Error getting session: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -216,7 +199,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('deleting session', () async {
           final id = args['session_id'] as int;
           developer.log('Deleting session $id');
           final result = await db.deleteSession(id);
@@ -226,10 +209,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
           }
           developer.log('Session $id not found');
           return 'Session $id not found';
-        } catch (e, stackTrace) {
-          developer.log('Error deleting session: $e', stackTrace: stackTrace);
-          return 'Error deleting session: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -238,7 +218,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
           'Get details of the most recent active session. Returns "No active sessions found" if none exist.',
       parameters: [],
       execute: (args) async {
-        try {
+        return await handleToolError('getting active session', () async {
           developer.log('Getting most recent active session');
           final allSessions = await db.getAllSessions();
           final activeSessions = allSessions
@@ -257,13 +237,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
               'Active Session ID: ${session.id}\n  Start: ${session.startTime}\n  Notes: ${session.notes ?? 'None'}';
           developer.log('Found active session: $result');
           return result;
-        } catch (e, stackTrace) {
-          developer.log(
-            'Error getting active session: $e',
-            stackTrace: stackTrace,
-          );
-          return 'Error getting active session: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -291,7 +265,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('updating session notes', () async {
           final id = args['session_id'] as int;
           final notes = args['notes'] as String;
           final append = args['append'] as bool? ?? true;
@@ -320,13 +294,7 @@ List<Tool> getSessionTools(ISessionDatabase db) {
           }
           developer.log('Failed to update session $id');
           return 'Failed to update session $id';
-        } catch (e, stackTrace) {
-          developer.log(
-            'Error updating session notes: $e',
-            stackTrace: stackTrace,
-          );
-          return 'Error updating session notes: $e';
-        }
+        });
       },
     ),
   ];

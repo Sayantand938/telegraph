@@ -1,6 +1,7 @@
 import 'dart:developer' as developer;
 import 'package:telegraph/models/finance_transaction.dart';
 import 'package:telegraph/services/database/i_finance_database.dart';
+import 'package:telegraph/utils/tool_helpers.dart';
 import 'tool_definitions.dart';
 
 List<Tool> getFinanceTools(IFinanceDatabase db) {
@@ -36,21 +37,16 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('adding transaction', () async {
           final typeStr = args['type'] as String;
           final amount = args['amount'] as num;
           String? timestamp = args['transaction_time'] as String?;
           final note = args['note'] as String?;
 
-          final type = typeStr.toLowerCase() == 'expense'
-              ? TransactionType.expense
-              : TransactionType.income;
-
+          final type = parseTransactionType(typeStr);
           timestamp ??= DateTime.now().toIso8601String();
 
-          try {
-            DateTime.parse(timestamp);
-          } catch (e) {
+          if (!isValidIso8601(timestamp)) {
             return 'Invalid transaction_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
           }
 
@@ -72,14 +68,9 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           final id = await db.createTransaction(transaction);
           developer.log('Transaction added successfully with ID: $id');
 
-          final typeLabel = type == TransactionType.income
-              ? 'Income'
-              : 'Expense';
+          final typeLabel = transactionTypeLabel(type);
           return '$typeLabel transaction recorded (ID: $id)\n  Amount: \$${amount.toStringAsFixed(2)}\n  Time: $timestamp${note != null ? '\n  Note: $note' : ''}';
-        } catch (e, stackTrace) {
-          developer.log('Error adding transaction: $e', stackTrace: stackTrace);
-          return 'Error adding transaction: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -107,7 +98,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('listing transactions', () async {
           final typeStr = args['type'] as String?;
           final startDateStr = args['start_date'] as String?;
           final endDateStr = args['end_date'] as String?;
@@ -115,13 +106,14 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           List<FinanceTransaction> transactions;
 
           if (startDateStr != null && endDateStr != null) {
+            if (!isValidIso8601(startDateStr) || !isValidIso8601(endDateStr)) {
+              return 'Invalid date format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
+            }
             final start = DateTime.parse(startDateStr);
             final end = DateTime.parse(endDateStr);
             transactions = await db.getTransactionsByDateRange(start, end);
           } else if (typeStr != null) {
-            final type = typeStr.toLowerCase() == 'expense'
-                ? TransactionType.expense
-                : TransactionType.income;
+            final type = parseTransactionType(typeStr);
             transactions = await db.getTransactionsByType(type);
           } else {
             transactions = await db.getAllTransactions();
@@ -137,9 +129,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           double totalExpense = 0;
 
           for (final tx in transactions) {
-            final typeLabel = tx.type == TransactionType.income
-                ? 'Income'
-                : 'Expense';
+            final typeLabel = transactionTypeLabel(tx.type);
             buffer.writeln(
               '  ID ${tx.id}: [$typeLabel] \$${tx.amount.toStringAsFixed(2)} at ${tx.transactionTime}',
             );
@@ -168,13 +158,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           final result = buffer.toString();
           developer.log('Listed ${transactions.length} transactions');
           return result;
-        } catch (e, stackTrace) {
-          developer.log(
-            'Error listing transactions: $e',
-            stackTrace: stackTrace,
-          );
-          return 'Error listing transactions: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -189,7 +173,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('getting transaction', () async {
           final id = args['transaction_id'] as int;
           developer.log('Getting transaction $id');
           final tx = await db.getTransaction(id);
@@ -197,20 +181,12 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
             developer.log('Transaction $id not found');
             return 'Transaction $id not found';
           }
-          final typeLabel = tx.type == TransactionType.income
-              ? 'Income'
-              : 'Expense';
+          final typeLabel = transactionTypeLabel(tx.type);
           final result =
               'Transaction $id:\n  Type: $typeLabel\n  Amount: \$${tx.amount.toStringAsFixed(2)}\n  Time: ${tx.transactionTime}\n  Note: ${tx.note ?? 'None'}';
           developer.log('Transaction found: $result');
           return result;
-        } catch (e, stackTrace) {
-          developer.log(
-            'Error getting transaction: $e',
-            stackTrace: stackTrace,
-          );
-          return 'Error getting transaction: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -225,7 +201,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('deleting transaction', () async {
           final id = args['transaction_id'] as int;
           developer.log('Deleting transaction $id');
           final result = await db.deleteTransaction(id);
@@ -235,13 +211,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           }
           developer.log('Transaction $id not found');
           return 'Transaction $id not found';
-        } catch (e, stackTrace) {
-          developer.log(
-            'Error deleting transaction: $e',
-            stackTrace: stackTrace,
-          );
-          return 'Error deleting transaction: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -280,7 +250,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('updating transaction', () async {
           final id = args['transaction_id'] as int;
           developer.log('Updating transaction $id');
 
@@ -293,9 +263,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           TransactionType? type;
           if (args.containsKey('type')) {
             final typeStr = (args['type'] as String).toLowerCase();
-            type = typeStr == 'expense'
-                ? TransactionType.expense
-                : TransactionType.income;
+            type = parseTransactionType(typeStr);
           }
 
           double? amount;
@@ -310,12 +278,10 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           String? timestamp;
           if (args.containsKey('transaction_time')) {
             final ts = args['transaction_time'] as String;
-            try {
-              DateTime.parse(ts);
-              timestamp = ts;
-            } catch (e) {
+            if (!isValidIso8601(ts)) {
               return 'Invalid transaction_time format. Use ISO 8601 (e.g., 2025-01-15T10:30:00)';
             }
+            timestamp = ts;
           }
 
           String? note;
@@ -336,13 +302,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
             return 'Transaction $id updated successfully';
           }
           return 'Failed to update transaction $id';
-        } catch (e, stackTrace) {
-          developer.log(
-            'Error updating transaction: $e',
-            stackTrace: stackTrace,
-          );
-          return 'Error updating transaction: $e';
-        }
+        });
       },
     ),
     Tool(
@@ -359,7 +319,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
         ),
       ],
       execute: (args) async {
-        try {
+        return await handleToolError('generating financial summary', () async {
           final period = (args['period'] as String?)?.toLowerCase() ?? 'all';
           DateTime? start;
           DateTime? end;
@@ -421,10 +381,7 @@ List<Tool> getFinanceTools(IFinanceDatabase db) {
           final result = buffer.toString();
           developer.log('Generated financial summary for period: $period');
           return result;
-        } catch (e, stackTrace) {
-          developer.log('Error generating summary: $e', stackTrace: stackTrace);
-          return 'Error generating summary: $e';
-        }
+        });
       },
     ),
   ];
