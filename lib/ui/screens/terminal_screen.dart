@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:get_it/get_it.dart';
 import 'package:telegraph/models/chat_entry.dart';
-import 'package:telegraph/services/ai/llm_service.dart';
+import 'package:telegraph/services/ai/llm_service_new.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});
@@ -15,7 +15,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
-  late final LlmService _llmService;
+  late final LlmServiceNew _llmService;
 
   // History of responses displayed in the terminal
   final List<ChatEntry> _history = [
@@ -173,8 +173,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   @override
   void initState() {
     super.initState();
-    _llmService = GetIt.instance<LlmService>();
-    _llmService.initialize();
+    _llmService = GetIt.instance<LlmServiceNew>();
   }
 
   @override

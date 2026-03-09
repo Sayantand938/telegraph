@@ -10,8 +10,14 @@ abstract class BaseDatabase<T> {
   final String? loggerName;
   Database? _databaseInstance;
   bool _initializationAttempted = false;
+  final Database? _injectedDatabase;
 
-  BaseDatabase(this.dbName, [this.loggerName]);
+  BaseDatabase(this.dbName, [this.loggerName]) : _injectedDatabase = null;
+
+  /// Constructor for testing that allows injecting a pre-opened database.
+  /// This is useful for in-memory databases where multiple instances
+  /// need to share the same connection.
+  BaseDatabase.injected(this._injectedDatabase, this.dbName, [this.loggerName]);
 
   // Abstract methods that subclasses must implement
   Map<String, dynamic> toMap(T model);
@@ -20,6 +26,11 @@ abstract class BaseDatabase<T> {
   Future<void> onCreate(Database db, int version);
 
   Future<Database> get database async {
+    // If we have an injected database, use it directly
+    if (_injectedDatabase != null) {
+      return _injectedDatabase!;
+    }
+
     if (_databaseInstance != null) return _databaseInstance!;
 
     if (_initializationAttempted) {

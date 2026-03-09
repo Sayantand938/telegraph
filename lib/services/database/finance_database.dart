@@ -9,6 +9,10 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction>
     implements IFinanceDatabase {
   FinanceDatabase() : super('telegraph_finance.db', 'FinanceDatabase');
 
+  /// Constructor for testing with an injected database connection
+  FinanceDatabase.injected(Database db, String? name)
+    : super.injected(db, name ?? 'telegraph_finance.db', 'FinanceDatabase');
+
   @override
   String get tableName => 'finance_transactions';
 

@@ -1,4 +1,3 @@
-import 'package:get_it/get_it.dart';
 import 'llm_service_new.dart';
 
 /// Legacy AiResponse class - kept for backward compatibility
@@ -11,47 +10,28 @@ class AiResponse {
 }
 
 /// Legacy LlmService - now a thin wrapper around the new architecture
-/// Maintains singleton pattern for backward compatibility
+/// This class is DEPRECATED. Use LlmServiceNew directly via DI.
+@Deprecated(
+  'Use LlmServiceNew via GetIt instead. This wrapper maintains backward compatibility.',
+)
 class LlmService {
-  static final LlmService _instance = LlmService._internal();
-  factory LlmService() => _instance;
-  LlmService._internal();
+  late final LlmServiceNew _newService;
 
-  late LlmServiceNew _newService;
-  bool _initialized = false;
-
-  Future<void> initialize() async {
-    if (_initialized) return;
-
-    // Get the new service from GetIt
-    _newService = GetIt.instance<LlmServiceNew>();
-    await _newService.initialize();
-    _initialized = true;
-  }
+  LlmService(this._newService);
 
   void clearHistory() {
     _newService.clearHistory();
   }
 
   Future<bool> healthCheck() async {
-    if (!_initialized) {
-      await initialize();
-    }
     return await _newService.healthCheck();
   }
 
   String getModelName() {
-    if (!_initialized) {
-      throw Exception('Service not initialized. Call initialize() first.');
-    }
     return _newService.getModelName();
   }
 
   Future<AiResponse> sendMessage(String message, {bool stream = false}) async {
-    if (!_initialized) {
-      await initialize();
-    }
-
     final response = await _newService.sendMessage(message, stream: stream);
 
     // Convert to legacy AiResponse format

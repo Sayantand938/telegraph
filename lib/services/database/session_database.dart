@@ -10,6 +10,10 @@ class SessionDatabase extends BaseDatabase<Session>
     implements ISessionDatabase {
   SessionDatabase() : super('telegraph.db', 'SessionDatabase');
 
+  /// Constructor for testing with an injected database connection
+  SessionDatabase.injected(Database db, String? name)
+    : super.injected(db, name ?? 'telegraph.db', 'SessionDatabase');
+
   @override
   String get tableName => 'sessions';
 
