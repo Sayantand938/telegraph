@@ -1,5 +1,6 @@
 /// Custom exception hierarchy for the Telegraph application.
 /// Provides typed exceptions that enable precise error handling and reporting.
+library;
 
 /// Base exception for all application-specific errors.
 abstract class AppException implements Exception {
@@ -11,7 +12,7 @@ abstract class AppException implements Exception {
 
   @override
   String toString() {
-    final buffer = StringBuffer('${runtimeType.toString()}');
+    final buffer = StringBuffer(runtimeType.toString());
     if (code != null) {
       buffer.write('(code: $code)');
     }
@@ -25,14 +26,12 @@ abstract class AppException implements Exception {
 
 /// Exception thrown when a database operation fails.
 class DatabaseException extends AppException {
-  DatabaseException(String message, {String? code, dynamic originalError})
-    : super(message, code: code, originalError: originalError);
+  DatabaseException(super.message, {super.code, super.originalError});
 }
 
 /// Exception thrown when the AI service is unavailable or returns an error.
 class AiServiceException extends AppException {
-  AiServiceException(String message, {String? code, dynamic originalError})
-    : super(message, code: code, originalError: originalError);
+  AiServiceException(super.message, {super.code, super.originalError});
 }
 
 /// Exception thrown when input validation fails.
@@ -40,11 +39,11 @@ class ValidationException extends AppException {
   final Map<String, String>? fieldErrors;
 
   ValidationException(
-    String message, {
-    String? code,
+    super.message, {
+    super.code,
     this.fieldErrors,
-    dynamic originalError,
-  }) : super(message, code: code, originalError: originalError);
+    super.originalError,
+  });
 
   @override
   String toString() {
@@ -65,10 +64,10 @@ class ToolException extends AppException {
 
   ToolException(
     this.toolName,
-    String message, {
-    String? code,
-    dynamic originalError,
-  }) : super(message, code: code, originalError: originalError);
+    super.message, {
+    super.code,
+    super.originalError,
+  });
 
   @override
   String toString() {
@@ -78,18 +77,15 @@ class ToolException extends AppException {
 
 /// Exception thrown when a resource is not found.
 class NotFoundException extends AppException {
-  NotFoundException(String message, {String? code, dynamic originalError})
-    : super(message, code: code, originalError: originalError);
+  NotFoundException(super.message, {super.code, super.originalError});
 }
 
 /// Exception thrown when a user is not authorized to perform an action.
 class UnauthorizedException extends AppException {
-  UnauthorizedException(String message, {String? code, dynamic originalError})
-    : super(message, code: code, originalError: originalError);
+  UnauthorizedException(super.message, {super.code, super.originalError});
 }
 
 /// Exception thrown when a business rule is violated.
 class BusinessLogicException extends AppException {
-  BusinessLogicException(String message, {String? code, dynamic originalError})
-    : super(message, code: code, originalError: originalError);
+  BusinessLogicException(super.message, {super.code, super.originalError});
 }

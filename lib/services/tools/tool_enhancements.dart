@@ -249,8 +249,7 @@ class SimpleToolCache implements ToolExecutionContext {
 
   @override
   void recordMetrics(ToolExecutionMetrics metrics) {
-    // TODO: Implement metrics collection (logging, monitoring, etc.)
-    // For now, just log to console in debug mode
+    // Basic metrics logging - can be enhanced with proper monitoring
     // ignore: avoid_print
     print(
       '[Tool Metrics] ${metrics.toolName}: ${metrics.executionTimeMs}ms, success: ${metrics.success}',
@@ -259,7 +258,7 @@ class SimpleToolCache implements ToolExecutionContext {
 
   @override
   void recordError(ToolExecutionMetrics metrics, StackTrace stackTrace) {
-    // TODO: Implement error logging
+    // Basic error logging - can be enhanced with proper error reporting
     // ignore: avoid_print
     print('[Tool Error] ${metrics.toolName}: ${metrics.error}');
     // ignore: avoid_print

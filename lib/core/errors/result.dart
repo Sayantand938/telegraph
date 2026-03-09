@@ -116,6 +116,7 @@ sealed class Result<T> {
 
 /// Represents a successful result with a value.
 class Success<T> extends Result<T> {
+  @override
   final T value;
 
   Success(this.value);
@@ -126,6 +127,7 @@ class Success<T> extends Result<T> {
 
 /// Represents a failed result with an error.
 class Failure<T> extends Result<T> {
+  @override
   final AppException error;
 
   Failure(this.error);

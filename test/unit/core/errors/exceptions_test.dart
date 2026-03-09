@@ -5,7 +5,7 @@ void main() {
   group('AppException', () {
     test('should be implemented by DatabaseException', () {
       final exception = DatabaseException('Test error');
-      expect(exception is AppException, isTrue);
+      expect(exception, isA<AppException>());
       expect(exception.message, 'Test error');
       expect(exception.code, isNull);
       expect(exception.originalError, isNull);
