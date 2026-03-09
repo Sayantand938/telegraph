@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import '../services/nim_service.dart';
+import '../../models/chat_entry.dart';
+import '../../services/ai/nim_service.dart';
 
 class TerminalScreen extends StatefulWidget {
   const TerminalScreen({super.key});
@@ -71,10 +72,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       }
     } catch (e) {
       setState(() {
-        _history.add(ChatEntry(
-          text: 'Error: $e',
-          type: ChatEntryType.error,
-        ));
+        _history.add(ChatEntry(text: 'Error: $e', type: ChatEntryType.error));
         _history.add(ChatEntry(text: '', type: ChatEntryType.blank));
         _isProcessing = false;
       });
@@ -92,17 +90,17 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
   Future<bool> _processCommand(String command, String fullInput) async {
     switch (command) {
-    case '/help':
-      final response = ChatEntry(
-        text: '''Available commands:
+      case '/help':
+        final response = ChatEntry(
+          text: '''Available commands:
 /help  - Show this message
 /clear - Clear the screen
 /health - Check if AI is online
 /model - Show current model name
 /echo  - Repeat text (e.g., /echo hello)
 /date  - Show current date/time''',
-        type: ChatEntryType.system,
-      );
+          type: ChatEntryType.system,
+        );
         setState(() {
           _history.add(response);
         });
@@ -319,7 +317,9 @@ class _TerminalScreenState extends State<TerminalScreen> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.greenAccent),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.greenAccent,
+                          ),
                         ),
                       ),
                   ],
@@ -467,25 +467,5 @@ class _TerminalScreenState extends State<TerminalScreen> {
       case ChatEntryType.blank:
         return Colors.transparent;
     }
-  }
-}
-
-enum ChatEntryType { user, ai, error, system, blank }
-
-class ChatEntry {
-  final String text;
-  final String? reasoning;
-  final ChatEntryType type;
-  bool isReasoningExpanded;
-
-  ChatEntry({
-    required this.text,
-    this.reasoning,
-    required this.type,
-    this.isReasoningExpanded = false,
-  });
-
-  void toggleReasoning() {
-    isReasoningExpanded = !isReasoningExpanded;
   }
 }

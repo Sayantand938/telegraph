@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'terminal_screen.dart';
+import 'screens/terminal_screen.dart';
 
 class TerminalApp extends StatelessWidget {
   const TerminalApp({super.key});

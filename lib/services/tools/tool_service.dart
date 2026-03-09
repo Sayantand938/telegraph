@@ -1,4 +1,5 @@
-import 'package:telegraph/services/session_database.dart';
+import '../../models/session.dart';
+import '../../services/database/session_database.dart';
 import 'dart:developer' as developer;
 
 class ToolParameter {

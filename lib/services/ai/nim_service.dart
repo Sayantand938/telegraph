@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:telegraph/services/tool_service.dart';
+import '../tools/tool_service.dart';
 
 class AiResponse {
   final String? reasoning;
