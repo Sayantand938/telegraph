@@ -58,8 +58,14 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction>
   Future<List<FinanceTransaction>> getTransactionsByType(
     TransactionType type,
   ) async {
-    final all = await getAll();
-    return all.where((tx) => tx.type == type).toList();
+    final db = await database;
+    final maps = await db.query(
+      tableName,
+      where: 'type = ?',
+      whereArgs: [type.name],
+      orderBy: 'transaction_time DESC',
+    );
+    return maps.map(fromMap).toList();
   }
 
   @override
@@ -67,12 +73,14 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction>
     DateTime start,
     DateTime end,
   ) async {
-    final all = await getAll();
-    return all.where((tx) {
-      final ts = DateTime.parse(tx.transactionTime);
-      return ts.isAfter(start.subtract(const Duration(seconds: 1))) &&
-          ts.isBefore(end.add(const Duration(seconds: 1)));
-    }).toList();
+    final db = await database;
+    final maps = await db.query(
+      tableName,
+      where: 'transaction_time BETWEEN ? AND ?',
+      whereArgs: [start.toIso8601String(), end.toIso8601String()],
+      orderBy: 'transaction_time DESC',
+    );
+    return maps.map(fromMap).toList();
   }
 
   @override
@@ -81,11 +89,21 @@ class FinanceDatabase extends BaseDatabase<FinanceTransaction>
     DateTime? start,
     DateTime? end,
   }) async {
-    final transactions = start != null && end != null
-        ? await getTransactionsByDateRange(start, end)
-        : await getAll();
+    final db = await database;
 
-    final filtered = transactions.where((tx) => tx.type == type);
-    return filtered.fold<double>(0.0, (sum, tx) => sum + tx.amount);
+    String whereClause = 'type = ?';
+    List<dynamic> whereArgs = [type.name];
+
+    if (start != null && end != null) {
+      whereClause += ' AND transaction_time BETWEEN ? AND ?';
+      whereArgs.addAll([start.toIso8601String(), end.toIso8601String()]);
+    }
+
+    final result = await db.rawQuery(
+      'SELECT SUM(amount) as total FROM $tableName WHERE $whereClause',
+      whereArgs,
+    );
+
+    return (result.first['total'] as num?)?.toDouble() ?? 0.0;
   }
 }
